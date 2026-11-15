@@ -73,7 +73,7 @@ fun ExpandableText(
                                 text
                                     .substring(startIndex = 0, endIndex = lastCharIndex)
                                     .dropLast(showMoreText.length)
-                                    .dropLastWhile { Character.isWhitespace(it) || it == '.' }
+                                    .dropLastWhile { it.isJavaWhitespace() || it == '.' }
                             append(adjustText)
                             withStyle(style = showMoreStyle) { append(showMoreText) }
                         }
@@ -109,3 +109,11 @@ fun ExpandableText(
         )
     }
 }
+
+/** `Character.isWhitespace`, which (unlike Kotlin's `isWhitespace`) leaves out the no-break spaces. */
+private fun Char.isJavaWhitespace(): Boolean =
+    when (code) {
+        0x00A0, 0x2007, 0x202F -> false
+        0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x1C, 0x1D, 0x1E, 0x1F -> true
+        else -> category == CharCategory.SPACE_SEPARATOR || category == CharCategory.LINE_SEPARATOR || category == CharCategory.PARAGRAPH_SEPARATOR
+    }

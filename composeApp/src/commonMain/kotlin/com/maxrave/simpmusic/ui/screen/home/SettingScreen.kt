@@ -101,6 +101,7 @@ import com.maxrave.common.SUPPORTED_LANGUAGE
 import com.maxrave.common.SUPPORTED_LOCATION
 import com.maxrave.common.SponsorBlockType
 import com.maxrave.common.VIDEO_QUALITY
+import com.maxrave.domain.extension.epochMillisToLocalDateTime
 import com.maxrave.domain.extension.now
 import com.maxrave.domain.data.model.lyrics.RomanizationDictionaryState
 import com.maxrave.domain.data.model.lyrics.RomanizationLanguage
@@ -466,9 +467,6 @@ import simpmusic.composeapp.generated.resources.youtube_account
 import simpmusic.composeapp.generated.resources.youtube_subtitle_language
 import simpmusic.composeapp.generated.resources.youtube_subtitle_language_message
 import simpmusic.composeapp.generated.resources.youtube_transcript
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 
 @OptIn(
     ExperimentalMaterial3Api::class,
@@ -637,10 +635,7 @@ fun SettingScreen(
                 return@derivedStateOf runBlocking {
                     getString(
                         Res.string.last_checked_at,
-                        DateTimeFormatter
-                            .ofPattern("yyyy-MM-dd HH:mm:ss")
-                            .withZone(ZoneId.systemDefault())
-                            .format(Instant.ofEpochMilli(lastCheckLong)),
+                        formatEpochMillis(lastCheckLong),
                     )
                 }
             }
@@ -2750,10 +2745,7 @@ fun SettingScreen(
                                     if (autoBackupLastTime == 0L) {
                                         stringResource(Res.string.never)
                                     } else {
-                                        DateTimeFormatter
-                                            .ofPattern("yyyy-MM-dd HH:mm:ss")
-                                            .withZone(ZoneId.systemDefault())
-                                            .format(Instant.ofEpochMilli(autoBackupLastTime))
+                                        formatEpochMillis(autoBackupLastTime)
                                     },
                             )
                         }
@@ -3656,3 +3648,8 @@ private fun ImportProgressDialog(
         },
     )
 }
+
+/** "yyyy-MM-dd HH:mm:ss" in the system time zone, what java.time's DateTimeFormatter gave here before. */
+@OptIn(FormatStringsInDatetimeFormats::class)
+private fun formatEpochMillis(epochMillis: Long): String =
+    epochMillisToLocalDateTime(epochMillis).format(LocalDateTime.Format { byUnicodePattern("yyyy-MM-dd HH:mm:ss") })

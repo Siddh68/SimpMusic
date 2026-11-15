@@ -70,6 +70,7 @@ import com.maxrave.domain.manager.DataStoreManager
 import com.maxrave.domain.data.model.lyrics.RomanizationDictionaryState
 import com.maxrave.domain.data.model.lyrics.RomanizationLanguage
 import com.maxrave.domain.repository.LyricsRomanizerRepository
+import com.maxrave.simpmusic.expect.textBidi
 import com.maxrave.simpmusic.expect.ui.isLyricsBlurSupported
 import com.maxrave.domain.data.model.metadata.Line
 import com.maxrave.simpmusic.ui.screen.player.content.NowPlayingContentActions
@@ -90,7 +91,6 @@ import com.maxrave.simpmusic.viewModel.SharedViewModel
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
-import java.text.Bidi
 import kotlin.math.abs
 import kotlin.math.exp
 import kotlin.math.sqrt
@@ -1080,11 +1080,9 @@ private fun AnimatedWord(
 ) {
     val wordBidi =
         remember(word, lineDirection) {
-            val fallback =
-                if (lineDirection == LayoutDirection.Rtl) Bidi.DIRECTION_DEFAULT_RIGHT_TO_LEFT else Bidi.DIRECTION_DEFAULT_LEFT_TO_RIGHT
-            Bidi(word, fallback)
+            textBidi(word, rtlFallback = lineDirection == LayoutDirection.Rtl)
         }
-    val wordDirection = if (wordBidi.baseIsLeftToRight()) TextDirection.Ltr else TextDirection.Rtl
+    val wordDirection = if (wordBidi.baseIsLeftToRight) TextDirection.Ltr else TextDirection.Rtl
     val style =
         typo().headlineLarge.copy(
             fontSize = customFontSize ?: typo().headlineLarge.fontSize,

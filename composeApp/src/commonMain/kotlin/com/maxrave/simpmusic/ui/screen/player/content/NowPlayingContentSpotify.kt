@@ -112,6 +112,7 @@ import com.kmpalette.rememberPaletteState
 import com.maxrave.common.Config.MAIN_PLAYER
 import com.maxrave.domain.mediaservice.handler.RepeatState
 import com.maxrave.simpmusic.Platform
+import com.maxrave.simpmusic.expect.formatGrouped
 import com.maxrave.simpmusic.expect.ui.MediaPlayerView
 import com.maxrave.simpmusic.expect.ui.MediaPlayerViewWithSubtitle
 import com.maxrave.simpmusic.expect.ui.toImageBitmap
@@ -1591,7 +1592,7 @@ fun NowPlayingContentSpotify(
                                         text =
                                             stringResource(
                                                 Res.string.view_count,
-                                                "%,d".format(state.screenData.songInfoData?.viewCount),
+                                                formatGrouped(state.screenData.songInfoData?.viewCount),
                                             ),
                                         style = typo().labelMedium,
                                         color = Color.White,

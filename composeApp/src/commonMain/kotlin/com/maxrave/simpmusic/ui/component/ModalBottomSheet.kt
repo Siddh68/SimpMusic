@@ -138,6 +138,7 @@ import com.maxrave.domain.utils.connectArtists
 import com.maxrave.domain.utils.toListName
 import com.maxrave.logger.Logger
 import com.maxrave.simpmusic.expect.copyToClipboard
+import com.maxrave.simpmusic.expect.formatOneDecimal
 import com.maxrave.simpmusic.expect.shareUrl
 import com.maxrave.simpmusic.expect.ui.VerticalScrollBar
 import com.maxrave.simpmusic.expect.ui.persistPickedImage
@@ -2194,7 +2195,7 @@ fun PlaybackSpeedPitchBottomSheet(
                         )
                     }
                     Text(
-                        text = "x${String.format("%.1f", playbackSpeed)}",
+                        text = "x${formatOneDecimal(playbackSpeed)}",
                         style = typo().titleMedium,
                         color = rememberSurfaceDarkColors().subtitle,
                         modifier = Modifier.widthIn(min = 60.dp),

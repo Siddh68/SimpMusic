@@ -9,6 +9,7 @@ import com.maxrave.domain.repository.BrowserLoginTarget
 import com.maxrave.domain.repository.BrowserProfile
 import com.maxrave.domain.repository.BrowserProfileStatus
 import com.maxrave.logger.LogLevel
+import com.maxrave.simpmusic.expect.firstStackFrame
 import com.maxrave.simpmusic.viewModel.base.BaseViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -47,8 +48,7 @@ class BrowserLoginViewModel(
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
-                val site = error.stackTrace.firstOrNull { it.className.startsWith("com.maxrave.data.browserlogin.") }
-                val location = site?.let { "${it.className}.${it.methodName}:${it.lineNumber}" } ?: "unknown"
+                val location = error.firstStackFrame("com.maxrave.data.browserlogin.") ?: "unknown"
                 // Never pass the throwable/message: native file errors can contain private paths.
                 log("Browser discovery failed: ${error::class.simpleName} at $location", LogLevel.WARN)
                 _state.value = _state.value.copy(loading = false, error = BrowserLoginFailure.INVALID_DATA)
