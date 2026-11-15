@@ -1,0 +1,202 @@
+name: iOS framework
+
+# Builds the Kotlin Multiplatform `ComposeApp` XCFramework on macOS and publishes it to the
+# rolling prerelease `ios-framework-latest`. The iOS app itself is built on Windows/WSL with
+# xtool from iosApp/ (see scripts/ios/README.md), which downloads that release asset.
+#
+# ASSUMPTION: composeApp/build.gradle.kts declares the iOS targets with
+#   val xcf = XCFramework("ComposeApp")
+#   listOf(iosArm64(), iosSimulatorArm64()).forEach {
+#       it.binaries.framework { baseName = "ComposeApp"; isStatic = false; xcf.add(this) }
+#   }
+# which creates :composeApp:assembleComposeApp{Release,Debug}XCFramework with output in
+# composeApp/build/XCFrameworks/{release,debug}/ComposeApp.xcframework. The framework must be
+# dynamic: Compose resources travel inside it and xtool embeds it as a binaryTarget.
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: "XCFramework build type"
+        type: choice
+        options:
+          - release
+          - debug
+        default: release
+  push:
+    branches:
+      - ios
+    paths-ignore:
+      - '**.md'
+      - 'fastlane/**'
+      - 'asset/**'
+      - 'changelogs/**'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/FUNDING.yml'
+      - 'scripts/ios/**'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ios-framework-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # push events have no inputs -> release
+  BUILD_TYPE: ${{ github.event.inputs.build_type || 'release' }}
+
+jobs:
+  framework:
+    runs-on: macos-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Cache Kotlin/Native (~/.konan)
+        uses: actions/cache@v4
+        with:
+          path: ~/.konan
+          key: konan-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('gradle/libs.versions.toml') }}
+          restore-keys: konan-${{ runner.os }}-${{ runner.arch }}-
+
+      # FOSS flavour. Every module reads the flag as `extra["isFullBuild"] == "true"`;
+      # both a -P override and a later line in gradle.properties win over the committed
+      # `isFullBuild=true` (verified on Gradle 9.8.1). We do both: the appended line keeps
+      # the value right even for Gradle invocations that forget the -P flag.
+      # With isFullBuild=false, BuildKonfig/Sentry never read local.properties and the
+      # proprietary modules (cast, lastfm, crashlytics) are swapped for their *-empty stubs.
+      # An empty local.properties is still created so nothing trips over a missing file.
+      - name: Configure FOSS build (no secrets)
+        run: |
+          printf '\nisFullBuild=false\n' >> gradle.properties
+          touch local.properties
+          tail -3 gradle.properties
+
+      - name: Toolchain info
+        run: |
+          sw_vers; xcodebuild -version; java -version
+          echo "ANDROID_HOME=${ANDROID_HOME:-<unset>}"
+          chmod +x gradlew
+
+      - name: Build XCFramework (${{ env.BUILD_TYPE }})
+        run: |
+          case "$BUILD_TYPE" in
+            debug)   TASK=assembleComposeAppDebugXCFramework ;;
+            *)       TASK=assembleComposeAppReleaseXCFramework ;;
+          esac
+          ./gradlew ":composeApp:$TASK" -PisFullBuild=false --stacktrace
+
+      - name: Inspect XCFramework
+        run: |
+          XCF="composeApp/build/XCFrameworks/$BUILD_TYPE/ComposeApp.xcframework"
+          test -d "$XCF"
+          find "$XCF" -maxdepth 3 | sort
+          file "$XCF"/ios-arm64/ComposeApp.framework/ComposeApp || true
+          echo "--- compose resources inside the framework:"
+          find "$XCF" -path '*compose-resources*' | head -20 || true
+          du -sh "$XCF"
+
+      - name: Zip (symlinks preserved)
+        run: |
+          mkdir -p out
+          ditto -c -k --sequesterRsrc --keepParent \
+            "composeApp/build/XCFrameworks/$BUILD_TYPE/ComposeApp.xcframework" \
+            out/ComposeApp.xcframework.zip
+          ls -la out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios-framework
+          path: out/ComposeApp.xcframework.zip
+          if-no-files-found: error
+
+      - name: Publish rolling prerelease ios-framework-latest
+        if: github.ref == 'refs/heads/ios'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG=ios-framework-latest
+          git tag -f "$TAG" "$GITHUB_SHA"
+          git push -f origin "refs/tags/$TAG"
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --prerelease --title "$TAG" \
+              --notes "Rolling build of ComposeApp.xcframework for the xtool iOS app."
+          fi
+          gh release edit "$TAG" --prerelease \
+            --notes "Rolling $BUILD_TYPE build of ComposeApp.xcframework from $GITHUB_SHA (run $GITHUB_RUN_ID)."
+          gh release upload "$TAG" out/ComposeApp.xcframework.zip --clobber
+
+  simulator:
+    # Smoke test only: does the framework load and Compose draw something in the simulator?
+    needs: framework
+    runs-on: macos-latest
+    timeout-minutes: 45
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: ios-framework
+          path: dl
+
+      - name: Unpack into iosApp/Frameworks
+        run: |
+          mkdir -p iosApp/Frameworks
+          ditto -x -k dl/ComposeApp.xcframework.zip iosApp/Frameworks
+          find iosApp/Frameworks -maxdepth 2 | sort
+
+      - name: Generate Xcode project (xcodegen)
+        run: |
+          which xcodegen || brew install xcodegen
+          cd iosApp/sim && xcodegen generate
+
+      - name: Build app for simulator
+        run: |
+          cd iosApp/sim
+          set -o pipefail
+          xcodebuild -project SimpMusicSim.xcodeproj -scheme SimpMusic -configuration Debug \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build ARCHS=arm64 ONLY_ACTIVE_ARCH=YES build | tail -60
+          APP=build/Build/Products/Debug-iphonesimulator/SimpMusic.app
+          test -d "$APP"
+          find "$APP" -maxdepth 3 | sort | head -60
+
+      - name: Run in simulator and screenshot
+        run: |
+          set -x
+          UDID=$(xcrun simctl list devices available -j | python3 -c '
+          import json,sys
+          d=json.load(sys.stdin)["devices"]
+          c=[(r,x) for r,l in d.items() if "iOS" in r for x in l if x["name"].startswith("iPhone")]
+          c.sort(key=lambda t:t[0])
+          print(c[-1][1]["udid"])')
+          xcrun simctl list devices | grep "$UDID"
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl install "$UDID" iosApp/sim/build/Build/Products/Debug-iphonesimulator/SimpMusic.app
+          mkdir -p shots
+          xcrun simctl launch --console-pty "$UDID" io.github.siddh68.simpmusic > shots/app-console.log 2>&1 &
+          sleep 40
+          xcrun simctl io "$UDID" screenshot shots/simulator.png
+          xcrun simctl spawn "$UDID" log show --last 3m --predicate 'process == "SimpMusic"' --style compact > shots/oslog.txt 2>&1 || true
+          xcrun simctl spawn "$UDID" launchctl list | grep -i simpmusic > shots/still-running.txt 2>&1 || echo "app not running (crashed?)" > shots/still-running.txt
+          cat shots/still-running.txt
+          cp ~/Library/Logs/DiagnosticReports/SimpMusic* shots/ 2>/dev/null || true
+          tail -80 shots/app-console.log || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: simulator-screenshot
+          path: shots/
