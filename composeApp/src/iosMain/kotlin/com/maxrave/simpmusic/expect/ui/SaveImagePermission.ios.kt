@@ -1,0 +1,17 @@
+package com.maxrave.simpmusic.expect.ui
+
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+
+// saveImageToDevice does nothing on iOS yet, so there is nothing to ask for: answer at once.
+@Composable
+actual fun rememberSaveImagePermission(onResult: (granted: Boolean) -> Unit): SaveImagePermissionRequester {
+    val currentOnResult by rememberUpdatedState(onResult)
+    return remember {
+        object : SaveImagePermissionRequester {
+            override fun requestIfNeeded() = currentOnResult(true)
+        }
+    }
+}
