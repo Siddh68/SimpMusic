@@ -5,6 +5,7 @@ import com.codingfeline.buildkonfig.compiler.FieldSpec.Type.STRING
 import org.gradle.api.file.RelativePath
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.plugin.mpp.apple.XCFramework
 import java.net.URI
 import java.security.MessageDigest
 import java.util.Properties
@@ -57,15 +58,22 @@ kotlin {
         }
     }
 
-//    listOf(
-//        iosArm64(),
-//        iosSimulatorArm64()
-//    ).forEach { iosTarget ->
-//        iosTarget.binaries.framework {
-//            baseName = "ComposeApp"
-//            isStatic = true
-//        }
-//    }
+    // Dynamic framework: Compose resources travel inside it, and the xtool iOS app embeds it as a
+    // binaryTarget. `.github/workflows/ios-framework.yml` builds it with
+    // :composeApp:assembleComposeApp{Release,Debug}XCFramework. No `-lsqlite3`: :data opens Room
+    // through BundledSQLiteDriver, which compiles its own SQLite in.
+    val xcf = XCFramework("ComposeApp")
+    listOf(
+        iosArm64(),
+        iosSimulatorArm64(),
+    ).forEach { iosTarget ->
+        iosTarget.binaries.framework {
+            baseName = "ComposeApp"
+            isStatic = false
+            binaryOption("bundleId", "io.github.siddh68.simpmusic.ComposeApp")
+            xcf.add(this)
+        }
+    }
 
     jvm()
 
@@ -108,6 +116,10 @@ kotlin {
 
             // Login WebViews: startUpWebView moves Chromium startup off the main thread
             implementation(libs.androidx.webkit)
+
+            // JVM-only artifacts, kept out of commonMain so the iOS targets resolve
+            implementation(libs.ui.tooling.preview)
+            api(libs.coil.network.okhttp)
         }
         commonMain.dependencies {
             implementation(libs.runtime)
@@ -122,8 +134,6 @@ kotlin {
             // Compose
             implementation(libs.compose.material3.adaptive)
             implementation(libs.compose.material.ripple)
-
-            implementation(libs.ui.tooling.preview)
 
             // Other module
             api(projects.common)
@@ -149,7 +159,6 @@ kotlin {
 
             // Coil
             api(libs.coil.compose)
-            api(libs.coil.network.okhttp)
             api(libs.kmpalette.core)
             api(libs.kmpalette.network)
             implementation(libs.materialkolor)
@@ -186,6 +195,11 @@ kotlin {
             implementation(libs.liquid.glass)
             implementation(libs.liquid.glass.shape)
         }
+        iosMain.dependencies {
+            // Coil fetches through Ktor here: coil-network-okhttp has no native variant
+            implementation(libs.coil.network.ktor3)
+            implementation(libs.ktor.client.darwin)
+        }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
         }
@@ -204,6 +218,10 @@ kotlin {
             implementation(libs.jna)
             // Login sync QR code
             implementation(libs.zxing.core)
+
+            // JVM-only artifacts, kept out of commonMain so the iOS targets resolve
+            implementation(libs.ui.tooling.preview)
+            api(libs.coil.network.okhttp)
         }
     }
 }
