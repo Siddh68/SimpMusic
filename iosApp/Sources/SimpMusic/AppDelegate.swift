@@ -1,4 +1,5 @@
 import AVFoundation
+import ComposeApp
 import UIKit
 
 /// UIKit entry point. The UI is the Compose Multiplatform root from the
@@ -10,6 +11,9 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
     ) -> Bool {
         configureAudioSession()
+        // Before the scene creates MainViewController(): Koin builds the player at startup and
+        // reads the engine from the registry.
+        MainViewControllerKt.registerNativePlayerEngine(engine: KotlinPlayerBridge(engine: PlayerEngine.shared))
         return true
     }
 
