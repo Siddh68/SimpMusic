@@ -18,6 +18,11 @@ val isFullBuild: Boolean =
         false
     }
 
+// -PiosDeviceOnly=true: the ComposeApp XCFramework gets only the iosArm64 (iPhone) slice. The CI
+// push build (.github/workflows/ios-framework.yml) uses it because the xtool install on the PC
+// only needs the device slice. Both iOS targets stay declared, so their link tasks still exist.
+val iosDeviceOnly: Boolean = providers.gradleProperty("iosDeviceOnly").orNull == "true"
+
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.compose.multiplatform)
@@ -62,6 +67,7 @@ kotlin {
     // binaryTarget. `.github/workflows/ios-framework.yml` builds it with
     // :composeApp:assembleComposeApp{Release,Debug}XCFramework. No `-lsqlite3`: :data opens Room
     // through BundledSQLiteDriver, which compiles its own SQLite in.
+    // -PiosDeviceOnly=true leaves the simulator slice out of the XCFramework (see iosDeviceOnly).
     val xcf = XCFramework("ComposeApp")
     listOf(
         iosArm64(),
@@ -71,7 +77,7 @@ kotlin {
             baseName = "ComposeApp"
             isStatic = false
             binaryOption("bundleId", "io.github.siddh68.simpmusic.ComposeApp")
-            xcf.add(this)
+            if (!iosDeviceOnly || iosTarget.name == "iosArm64") xcf.add(this)
         }
     }
 

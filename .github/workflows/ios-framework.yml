@@ -4,14 +4,15 @@ name: iOS framework
 # rolling prerelease `ios-framework-latest`. The iOS app itself is built on Windows/WSL with
 # xtool from iosApp/ (see scripts/ios/README.md), which downloads that release asset.
 #
-# ASSUMPTION: composeApp/build.gradle.kts declares the iOS targets with
-#   val xcf = XCFramework("ComposeApp")
-#   listOf(iosArm64(), iosSimulatorArm64()).forEach {
-#       it.binaries.framework { baseName = "ComposeApp"; isStatic = false; xcf.add(this) }
-#   }
-# which creates :composeApp:assembleComposeApp{Release,Debug}XCFramework with output in
+# composeApp/build.gradle.kts declares iosArm64 + iosSimulatorArm64 dynamic frameworks added to
+# XCFramework("ComposeApp") -> :composeApp:assembleComposeApp{Release,Debug}XCFramework, output
 # composeApp/build/XCFrameworks/{release,debug}/ComposeApp.xcframework. The framework must be
 # dynamic: Compose resources travel inside it and xtool embeds it as a binaryTarget.
+#
+# Push builds pass -PiosDeviceOnly=true: the XCFramework then holds only the ios-arm64 (iPhone)
+# slice, which is all the xtool device install uses (SwiftPM picks the ios-arm64 library from the
+# XCFramework's Info.plist). Same asset name/layout, one link instead of two.
+# The simulator slice and the simulator smoke test are manual only (workflow_dispatch inputs).
 
 on:
   workflow_dispatch:
@@ -23,6 +24,14 @@ on:
           - debug
           - release
         default: debug
+      simulator_slice:
+        description: "Also build the iosSimulatorArm64 slice (forced on by run_simulator)"
+        type: boolean
+        default: false
+      run_simulator:
+        description: "Run the simulator smoke test after the build"
+        type: boolean
+        default: false
   push:
     branches:
       - ios
@@ -47,6 +56,8 @@ env:
   # push events have no inputs -> debug. The first release link of the full app ran into the
   # job timeout (two optimised links in parallel on a 7 GB runner), so release is opt-in.
   BUILD_TYPE: ${{ github.event.inputs.build_type || 'debug' }}
+  # 'false' only on a manual run that asked for the simulator slice or the simulator test.
+  IOS_DEVICE_ONLY: ${{ (github.event_name == 'workflow_dispatch' && (inputs.simulator_slice || inputs.run_simulator)) && 'false' || 'true' }}
 
 jobs:
   framework:
@@ -62,7 +73,12 @@ jobs:
           distribution: temurin
           java-version: "21"
 
+      # `ios` is not the repo's default branch (dev), so setup-gradle would default to
+      # read-only and never save the Gradle User Home (dependencies + local build cache):
+      # every run re-downloaded everything. Writing is safe: entries are scoped to this branch.
       - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
 
       - name: Cache Kotlin/Native (~/.konan)
         uses: actions/cache@v4
@@ -90,22 +106,33 @@ jobs:
           echo "ANDROID_HOME=${ANDROID_HOME:-<unset>}"
           chmod +x gradlew
 
-      - name: Build XCFramework (${{ env.BUILD_TYPE }})
+      - name: Build XCFramework (${{ env.BUILD_TYPE }}, device only = ${{ env.IOS_DEVICE_ONLY }})
         run: |
           case "$BUILD_TYPE" in
             release) TASK=assembleComposeAppReleaseXCFramework; LINK=linkReleaseFramework ;;
             *)       TASK=assembleComposeAppDebugXCFramework;   LINK=linkDebugFramework ;;
           esac
-          # Link the two slices one after the other: both links run inside the Gradle daemon
-          # and together they do not fit in the runner's memory.
-          ./gradlew ":composeApp:${LINK}IosArm64" -PisFullBuild=false --stacktrace
-          ./gradlew ":composeApp:${LINK}IosSimulatorArm64" -PisFullBuild=false --stacktrace
-          ./gradlew ":composeApp:$TASK" -PisFullBuild=false --stacktrace
+          # --build-cache: task outputs (klibs of unchanged modules, KSP, resources) are reused
+          # from the cached Gradle User Home, keyed by their inputs. Link tasks are not cacheable.
+          ARGS="-PisFullBuild=false -PiosDeviceOnly=$IOS_DEVICE_ONLY --build-cache --stacktrace"
+          if [ "$IOS_DEVICE_ONLY" = true ]; then
+            # One slice -> one link; the XCFramework task depends on linkXxxFrameworkIosArm64 only.
+            ./gradlew ":composeApp:$TASK" $ARGS
+          else
+            # Link the two slices one after the other: both links run inside the Gradle daemon
+            # and together they do not fit in the runner's memory.
+            ./gradlew ":composeApp:${LINK}IosArm64" $ARGS
+            ./gradlew ":composeApp:${LINK}IosSimulatorArm64" $ARGS
+            ./gradlew ":composeApp:$TASK" $ARGS
+          fi
 
       - name: Inspect XCFramework
         run: |
           XCF="composeApp/build/XCFrameworks/$BUILD_TYPE/ComposeApp.xcframework"
           test -d "$XCF"
+          test -f "$XCF/ios-arm64/ComposeApp.framework/ComposeApp"
+          if [ "$IOS_DEVICE_ONLY" != true ]; then test -d "$XCF/ios-arm64-simulator"; fi
+          plutil -p "$XCF/Info.plist" || true
           find "$XCF" -maxdepth 3 | sort
           file "$XCF"/ios-arm64/ComposeApp.framework/ComposeApp || true
           echo "--- compose resources inside the framework:"
@@ -139,12 +166,15 @@ jobs:
               --notes "Rolling build of ComposeApp.xcframework for the xtool iOS app."
           fi
           gh release edit "$TAG" --prerelease \
-            --notes "Rolling $BUILD_TYPE build of ComposeApp.xcframework from $GITHUB_SHA (run $GITHUB_RUN_ID)."
+            --notes "Rolling $BUILD_TYPE build of ComposeApp.xcframework (device only: $IOS_DEVICE_ONLY) from $GITHUB_SHA (run $GITHUB_RUN_ID)."
           gh release upload "$TAG" out/ComposeApp.xcframework.zip --clobber
 
   simulator:
     # Smoke test only: does the framework load and Compose draw something in the simulator?
+    # Manual only (run_simulator input), so a push run is a single job and never waits for a
+    # second macOS runner.
     needs: framework
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_simulator }}
     runs-on: macos-latest
     timeout-minutes: 45
     continue-on-error: true

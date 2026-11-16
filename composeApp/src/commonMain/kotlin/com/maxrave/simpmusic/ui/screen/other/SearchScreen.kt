@@ -219,7 +219,7 @@ fun SearchScreen(
     // columns stretch each tile to half the window, and since the tile keeps a 2:1 ratio it grows
     // absurdly tall with it.
     val screenInfo = getScreenSizeInfo()
-    val isMobilePortrait = getPlatform() == Platform.Android && screenInfo.wDP < screenInfo.hDP
+    val isMobilePortrait = getPlatform() != Platform.Desktop && screenInfo.wDP < screenInfo.hDP
     val moodGridColumns = if (isMobilePortrait) 2 else 4
 
     val hazeState = rememberHazeState()
@@ -338,8 +338,8 @@ fun SearchScreen(
             }
     }
 
-    //On search icon click while on search screen, open keyboard. Android only feature
-    if (getPlatform() == Platform.Android) {
+    //On search icon click while on search screen, open keyboard. Touch platforms only (Android, iOS)
+    if (getPlatform() != Platform.Desktop) {
         val reloadDestination by sharedViewModel.reloadDestination.collectAsStateWithLifecycle()
         LaunchedEffect(reloadDestination) {
             if (reloadDestination == SearchDestination::class) {

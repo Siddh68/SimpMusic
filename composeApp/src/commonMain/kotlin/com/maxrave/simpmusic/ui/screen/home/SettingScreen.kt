@@ -622,6 +622,9 @@ fun SettingScreen(
     val castState by viewModel.castState.collectAsStateWithLifecycle()
 
     val isCheckingUpdate by sharedViewModel.isCheckingUpdate.collectAsStateWithLifecycle()
+    // iOS hides what has no iOS backend: device sync, the audio effects (its player ignores them)
+    // and the APK update check.
+    val isIos = getPlatform() == Platform.iOS
 
     val hazeState =
         rememberHazeState()
@@ -721,51 +724,53 @@ fun SettingScreen(
                         },
                 )
                 // Above every section, and inside item 0 rather than an item of its own, for the
-                // glow reason above.
-                SettingGroup(
-                    title = stringResource(Res.string.login_sync_section),
-                    modifier = Modifier.onSizeChanged { devicesGroupHeightPx = it.height },
-                ) {
-                    val syncPeer = librarySyncState.peers.firstOrNull()
-                    SettingItem(
-                        title =
-                            stringResource(
-                                if (getPlatform() == Platform.Android) Res.string.login_sync_android_title else Res.string.login_sync_desktop_title,
-                            ),
-                        subtitle =
-                            when {
-                                getPlatform() != Platform.Android -> stringResource(Res.string.login_sync_desktop_description)
-                                syncPeer != null -> stringResource(Res.string.library_sync_send_logins_paired, syncPeer.name)
-                                else -> stringResource(Res.string.login_sync_android_description)
-                            },
-                        onClick = { showLoginSyncDialog = true },
-                    )
-                    SettingItem(
-                        title = stringResource(Res.string.library_sync_title),
-                        subtitle =
-                            when {
-                                librarySyncState.problem == LibrarySyncProblem.WINDOWS_PUBLIC_NETWORK -> {
-                                    stringResource(Res.string.library_sync_windows_public)
-                                }
+                // glow reason above. iOS takes no part in login or library sync.
+                if (!isIos) {
+                    SettingGroup(
+                        title = stringResource(Res.string.login_sync_section),
+                        modifier = Modifier.onSizeChanged { devicesGroupHeightPx = it.height },
+                    ) {
+                        val syncPeer = librarySyncState.peers.firstOrNull()
+                        SettingItem(
+                            title =
+                                stringResource(
+                                    if (getPlatform() == Platform.Android) Res.string.login_sync_android_title else Res.string.login_sync_desktop_title,
+                                ),
+                            subtitle =
+                                when {
+                                    getPlatform() != Platform.Android -> stringResource(Res.string.login_sync_desktop_description)
+                                    syncPeer != null -> stringResource(Res.string.library_sync_send_logins_paired, syncPeer.name)
+                                    else -> stringResource(Res.string.login_sync_android_description)
+                                },
+                            onClick = { showLoginSyncDialog = true },
+                        )
+                        SettingItem(
+                            title = stringResource(Res.string.library_sync_title),
+                            subtitle =
+                                when {
+                                    librarySyncState.problem == LibrarySyncProblem.WINDOWS_PUBLIC_NETWORK -> {
+                                        stringResource(Res.string.library_sync_windows_public)
+                                    }
 
-                                syncPeer == null -> {
-                                    stringResource(
-                                        if (getPlatform() == Platform.Android) {
-                                            Res.string.library_sync_not_paired_android
-                                        } else {
-                                            Res.string.library_sync_not_paired_desktop
-                                        },
-                                    )
-                                }
+                                    syncPeer == null -> {
+                                        stringResource(
+                                            if (getPlatform() == Platform.Android) {
+                                                Res.string.library_sync_not_paired_android
+                                            } else {
+                                                Res.string.library_sync_not_paired_desktop
+                                            },
+                                        )
+                                    }
 
-                                else -> {
-                                    val names = librarySyncState.peers.joinToString { it.name }
-                                    librarySyncState.lastSyncAt?.let { stringResource(Res.string.library_sync_peer_synced, names, syncedAgo(it)) }
-                                        ?: stringResource(Res.string.library_sync_peer_not_synced, names)
-                                }
-                            },
-                        onClick = { showLibrarySyncDialog = true },
-                    )
+                                    else -> {
+                                        val names = librarySyncState.peers.joinToString { it.name }
+                                        librarySyncState.lastSyncAt?.let { stringResource(Res.string.library_sync_peer_synced, names, syncedAgo(it)) }
+                                            ?: stringResource(Res.string.library_sync_peer_not_synced, names)
+                                    }
+                                },
+                            onClick = { showLibrarySyncDialog = true },
+                        )
+                    }
                 }
                 SettingGroup(title = stringResource(Res.string.user_interface)) {
                     val themeModeLabels =
@@ -802,7 +807,7 @@ fun SettingScreen(
                     // Android 12, so on an older device they render as a flat, wrong-looking version of
                     // themselves. The requirement is spelled out on the option itself rather than left
                     // for the user to discover after switching.
-                    val requiresAndroid12 = " (" + stringResource(Res.string.requires_android_12) + ")"
+                    val requiresAndroid12 = if (isIos) "" else " (" + stringResource(Res.string.requires_android_12) + ")"
                     val nowPlayingStyleLabels =
                         listOf(
                             DataStoreManager.NOW_PLAYING_STYLE_SPOTIFY to stringResource(Res.string.now_playing_style_spotify),
@@ -1526,7 +1531,9 @@ fun SettingScreen(
                 // Android-only branch — "Open system equalizer" is an Android feature — and this
                 // one is on both platforms: mpv's `af` chain on Desktop, an AudioProcessor in the
                 // Media3 sink on Android, driven from the same stored curve.
-                AnimatedVisibility(visible = getPlatform() != Platform.Android || equalizerType != DataStoreManager.EQUALIZER_TYPE_SYSTEM) {
+                AnimatedVisibility(
+                    visible = !isIos && (getPlatform() != Platform.Android || equalizerType != DataStoreManager.EQUALIZER_TYPE_SYSTEM),
+                ) {
                     Column {
                         SettingItem(
                             title = stringResource(Res.string.equalizer),
@@ -1546,42 +1553,45 @@ fun SettingScreen(
                 // thing — one stored setting reshaping the audio on both backends — and a user
                 // hunting for "reverb" looks wherever the sound settings are, not under a heading
                 // they have to guess.
-                SettingItem(
-                    title = stringResource(Res.string.audio_delay),
-                    subtitle = stringResource(Res.string.audio_delay_description),
-                    smallSubtitle = true,
-                    switch = (delayEnabled to { viewModel.setDelayEnabled(it) }),
-                )
-                // Only while on, like the curve — and the three values survive the switch, so
-                // turning it back on returns to the echo the user dialled in.
-                AnimatedVisibility(visible = delayEnabled) {
-                    DelaySection()
-                }
-                SettingItem(
-                    title = stringResource(Res.string.audio_reverb),
-                    subtitle = stringResource(Res.string.audio_reverb_description),
-                    smallSubtitle = true,
-                    switch = (reverbEnabled to { viewModel.setReverbEnabled(it) }),
-                )
-                // Same again: the room and the wet level outlive the switch.
-                AnimatedVisibility(visible = reverbEnabled) {
-                    ReverbSection()
-                }
-                SettingItem(
-                    title = stringResource(Res.string.audio_eight_d),
-                    subtitle =
-                        when {
-                            castState.isRemote -> stringResource(Res.string.not_available_while_casting)
-                            !eightDAvailable -> stringResource(Res.string.eight_d_unavailable)
-                            else -> stringResource(Res.string.audio_eight_d_description)
-                        },
-                    smallSubtitle = true,
-                    switch = (eightDEnabled to viewModel::setEightDEnabled),
-                    // A saved on-state may still be switched off when the native filter is absent.
-                    isEnable = !castState.isRemote && (eightDAvailable || eightDEnabled),
-                )
-                AnimatedVisibility(visible = eightDEnabled && eightDAvailable && !castState.isRemote) {
-                    EightDSection()
+                // The iOS player has no delay, reverb or 8D stage; the switches would do nothing.
+                if (!isIos) {
+                    SettingItem(
+                        title = stringResource(Res.string.audio_delay),
+                        subtitle = stringResource(Res.string.audio_delay_description),
+                        smallSubtitle = true,
+                        switch = (delayEnabled to { viewModel.setDelayEnabled(it) }),
+                    )
+                    // Only while on, like the curve — and the three values survive the switch, so
+                    // turning it back on returns to the echo the user dialled in.
+                    AnimatedVisibility(visible = delayEnabled) {
+                        DelaySection()
+                    }
+                    SettingItem(
+                        title = stringResource(Res.string.audio_reverb),
+                        subtitle = stringResource(Res.string.audio_reverb_description),
+                        smallSubtitle = true,
+                        switch = (reverbEnabled to { viewModel.setReverbEnabled(it) }),
+                    )
+                    // Same again: the room and the wet level outlive the switch.
+                    AnimatedVisibility(visible = reverbEnabled) {
+                        ReverbSection()
+                    }
+                    SettingItem(
+                        title = stringResource(Res.string.audio_eight_d),
+                        subtitle =
+                            when {
+                                castState.isRemote -> stringResource(Res.string.not_available_while_casting)
+                                !eightDAvailable -> stringResource(Res.string.eight_d_unavailable)
+                                else -> stringResource(Res.string.audio_eight_d_description)
+                            },
+                        smallSubtitle = true,
+                        switch = (eightDEnabled to viewModel::setEightDEnabled),
+                        // A saved on-state may still be switched off when the native filter is absent.
+                        isEnable = !castState.isRemote && (eightDAvailable || eightDEnabled),
+                    )
+                    AnimatedVisibility(visible = eightDEnabled && eightDAvailable && !castState.isRemote) {
+                        EightDSection()
+                    }
                 }
                 SettingItem(
                     title = stringResource(Res.string.save_playback_state),
@@ -2789,53 +2799,56 @@ fun SettingScreen(
                         navController.navigate(CreditDestination)
                     },
                 )
-                SettingItem(
-                    title = stringResource(Res.string.auto_check_for_update),
-                    subtitle = stringResource(Res.string.auto_check_for_update_description),
-                    switch = (autoCheckUpdate to { viewModel.setAutoCheckUpdate(it) }),
-                )
-                SettingItem(
-                    title = stringResource(Res.string.update_channel),
-                    subtitle =
-                        if (updateChannel == DataStoreManager.FDROID) {
-                            "F-Droid"
-                        } else {
-                            "SimpMusic GitHub Release"
+                // The update check offers the upstream Android/Desktop download; it means nothing on iOS.
+                if (!isIos) {
+                    SettingItem(
+                        title = stringResource(Res.string.auto_check_for_update),
+                        subtitle = stringResource(Res.string.auto_check_for_update_description),
+                        switch = (autoCheckUpdate to { viewModel.setAutoCheckUpdate(it) }),
+                    )
+                    SettingItem(
+                        title = stringResource(Res.string.update_channel),
+                        subtitle =
+                            if (updateChannel == DataStoreManager.FDROID) {
+                                "F-Droid"
+                            } else {
+                                "SimpMusic GitHub Release"
+                            },
+                        onClick = {
+                            viewModel.setAlertData(
+                                SettingAlertState(
+                                    title = runBlocking { getString(Res.string.update_channel) },
+                                    selectOne =
+                                        SettingAlertState.SelectData(
+                                            listSelect =
+                                                listOf(
+                                                    (updateChannel == DataStoreManager.FDROID) to "F-Droid",
+                                                    (updateChannel == DataStoreManager.GITHUB) to "SimpMusic GitHub Release",
+                                                ),
+                                        ),
+                                    confirm =
+                                        runBlocking { getString(Res.string.change) } to { state ->
+                                            viewModel.setUpdateChannel(
+                                                when (state.selectOne?.getSelected()) {
+                                                    "F-Droid" -> DataStoreManager.FDROID
+                                                    "SimpMusic GitHub Release" -> DataStoreManager.GITHUB
+                                                    else -> DataStoreManager.GITHUB
+                                                },
+                                            )
+                                        },
+                                    dismiss = runBlocking { getString(Res.string.cancel) },
+                                ),
+                            )
                         },
-                    onClick = {
-                        viewModel.setAlertData(
-                            SettingAlertState(
-                                title = runBlocking { getString(Res.string.update_channel) },
-                                selectOne =
-                                    SettingAlertState.SelectData(
-                                        listSelect =
-                                            listOf(
-                                                (updateChannel == DataStoreManager.FDROID) to "F-Droid",
-                                                (updateChannel == DataStoreManager.GITHUB) to "SimpMusic GitHub Release",
-                                            ),
-                                    ),
-                                confirm =
-                                    runBlocking { getString(Res.string.change) } to { state ->
-                                        viewModel.setUpdateChannel(
-                                            when (state.selectOne?.getSelected()) {
-                                                "F-Droid" -> DataStoreManager.FDROID
-                                                "SimpMusic GitHub Release" -> DataStoreManager.GITHUB
-                                                else -> DataStoreManager.GITHUB
-                                            },
-                                        )
-                                    },
-                                dismiss = runBlocking { getString(Res.string.cancel) },
-                            ),
-                        )
-                    },
-                )
-                SettingItem(
-                    title = stringResource(Res.string.check_for_update),
-                    subtitle = checkForUpdateSubtitle,
-                    onClick = {
-                        sharedViewModel.checkForUpdate()
-                    },
-                )
+                    )
+                    SettingItem(
+                        title = stringResource(Res.string.check_for_update),
+                        subtitle = checkForUpdateSubtitle,
+                        onClick = {
+                            sharedViewModel.checkForUpdate()
+                        },
+                    )
+                }
                 SettingItem(
                     title = stringResource(Res.string.author),
                     subtitle = stringResource(Res.string.maxrave_dev),
