@@ -1,0 +1,41 @@
+name: Verify Android and Desktop
+
+# The iOS port moves JVM-only code out of the shared source sets. This workflow checks that the
+# Android app and the Desktop app still compile from the `ios` branch, and runs the JVM tests of
+# the core modules the port touched. Manual only: it is a gate check, not a per-push build.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Configure FOSS build (no secrets)
+        run: |
+          printf '\nisFullBuild=false\n' >> gradle.properties
+          touch local.properties
+          chmod +x gradlew
+
+      - name: Android app (debug)
+        run: ./gradlew :androidApp:assembleDebug -PisFullBuild=false --stacktrace
+
+      - name: Desktop compile
+        if: always()
+        run: ./gradlew :composeApp:compileKotlinJvm -PisFullBuild=false --stacktrace
+
+      - name: Core JVM tests touched by the port
+        if: always()
+        run: ./gradlew :loginSync:jvmTest :lyricsService:jvmTest :kotlinYtmusicScraper:jvmTest :composeApp:jvmTest -PisFullBuild=false --continue --stacktrace
