@@ -2,10 +2,16 @@ name: Verify Android and Desktop
 
 # The iOS port moves JVM-only code out of the shared source sets. This workflow checks that the
 # Android app and the Desktop app still compile from the `ios` branch, and runs the JVM tests of
-# the core modules the port touched. Manual only: it is a gate check, not a per-push build.
+# the core modules the port touched. It is a gate check, not a per-push build: run it by hand,
+# or by pushing a change to this file (manual runs need the file on the default branch).
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - ios
+    paths:
+      - '.github/workflows/verify-platforms.yml'
 
 jobs:
   verify:
