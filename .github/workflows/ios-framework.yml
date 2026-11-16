@@ -32,6 +32,13 @@ on:
         description: "Run the simulator smoke test after the build"
         type: boolean
         default: false
+      runner:
+        description: "Runner for the framework job (Intel is a separate pool for when arm64 is starved)"
+        type: choice
+        options:
+          - macos-latest
+          - macos-15-intel
+        default: macos-latest
   push:
     branches:
       - ios
@@ -49,7 +56,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: ios-framework-${{ github.ref }}
+  group: ios-framework-${{ github.ref }}-${{ inputs.runner || 'macos-latest' }}
   cancel-in-progress: true
 
 env:
@@ -61,7 +68,7 @@ env:
 
 jobs:
   framework:
-    runs-on: macos-latest
+    runs-on: ${{ inputs.runner || 'macos-latest' }}
     timeout-minutes: 150
     steps:
       - uses: actions/checkout@v4
