@@ -84,8 +84,7 @@ import dev.chrisbanes.haze.HazeInput
 import dev.chrisbanes.haze.blur.hazeBlur
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
-import io.ktor.client.HttpClient
-import io.ktor.client.engine.cio.CIO
+import com.maxrave.simpmusic.expect.platformHttpClient
 import io.ktor.http.Url
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -139,7 +138,7 @@ fun BrowseScreen(
         }
     var topHeaderColor by remember { mutableStateOf(backgroundColor) }
     val animatedColor by animateColorAsState(topHeaderColor, tween(500))
-    val httpClient = remember { HttpClient(CIO) }
+    val httpClient = remember { platformHttpClient() }
     val networkLoader = rememberNetworkLoader(httpClient)
     val dominantColorState =
         rememberDominantColorState(

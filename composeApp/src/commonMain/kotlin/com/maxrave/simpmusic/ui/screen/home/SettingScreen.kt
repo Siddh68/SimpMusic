@@ -2843,6 +2843,16 @@ fun SettingScreen(
                         uriHandler.openUri("https://github.com/maxrave-dev")
                     },
                 )
+                if (getPlatform() == Platform.iOS) {
+                    // The iOS port is a separate effort from the upstream app; credit its builder here.
+                    SettingItem(
+                        title = "iOS version by",
+                        subtitle = "Siddh Jain",
+                        onClick = {
+                            uriHandler.openUri("https://github.com/Siddh68")
+                        },
+                    )
+                }
                 SettingItem(
                     title = stringResource(Res.string.follow_me_on_x),
                     subtitle = "@maxrave_dev",

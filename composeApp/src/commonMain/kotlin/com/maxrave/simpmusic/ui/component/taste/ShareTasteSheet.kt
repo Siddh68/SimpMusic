@@ -36,8 +36,7 @@ import com.maxrave.simpmusic.ui.component.lyrics.ShareCardSignature
 import com.maxrave.simpmusic.ui.component.lyrics.ShareLyricsCardMaxWidth
 import com.maxrave.simpmusic.ui.component.lyrics.ShareLyricsPalette
 import com.maxrave.simpmusic.ui.component.lyrics.shareCardContentColor
-import io.ktor.client.HttpClient
-import io.ktor.client.engine.cio.CIO
+import com.maxrave.simpmusic.expect.platformHttpClient
 import io.ktor.http.Url
 import org.jetbrains.compose.resources.stringResource
 import simpmusic.composeapp.generated.resources.Res
@@ -164,7 +163,7 @@ private fun ShareTasteCard(
  */
 @Composable
 private fun rememberTasteSeedColor(imageUrl: String?): Color {
-    val httpClient = remember { HttpClient(CIO) }
+    val httpClient = remember { platformHttpClient() }
     DisposableEffect(httpClient) { onDispose { httpClient.close() } }
     val networkLoader = rememberNetworkLoader(httpClient)
     val dominantColorState =

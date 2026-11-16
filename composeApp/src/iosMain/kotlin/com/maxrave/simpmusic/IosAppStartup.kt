@@ -16,6 +16,7 @@ import com.maxrave.domain.mediaservice.handler.ToastType
 import com.maxrave.logger.Logger
 import com.maxrave.simpmusic.di.viewModelModule
 import com.maxrave.simpmusic.expect.iosDocumentsPath
+import com.maxrave.simpmusic.expect.platformHttpClient
 import com.maxrave.simpmusic.utils.ComposeResUtils
 import com.maxrave.simpmusic.utils.NetworkFirstInterceptor
 import com.maxrave.simpmusic.utils.VersionManager
@@ -97,7 +98,9 @@ private fun setUpImageLoader() {
                 .Builder(context)
                 .components {
                     add(NetworkFirstInterceptor { imageLoader })
-                    add(KtorNetworkFetcherFactory())
+                    // Name the engine: commonMain also ships CIO, which has no TLS on native, and a bare
+                    // HttpClient() may pick it — every https image then fails.
+                    add(KtorNetworkFetcherFactory(httpClient = { platformHttpClient() }))
                 }.diskCachePolicy(CachePolicy.ENABLED)
                 .networkCachePolicy(CachePolicy.ENABLED)
                 .diskCache(

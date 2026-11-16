@@ -198,8 +198,7 @@ import dev.chrisbanes.haze.HazeInput
 import dev.chrisbanes.haze.blur.hazeBlur
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
-import io.ktor.client.HttpClient
-import io.ktor.client.engine.cio.CIO
+import com.maxrave.simpmusic.expect.platformHttpClient
 import io.ktor.http.Url
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -352,7 +351,7 @@ fun HomeScreen(
     // leaving the tint as it was.
     val headerImage by viewModel.homeBackground.collectAsStateWithLifecycle()
     var headerImageFailed by remember(headerImage) { mutableStateOf(false) }
-    val networkLoader = rememberNetworkLoader(HttpClient(CIO))
+    val networkLoader = rememberNetworkLoader(platformHttpClient())
     val dominantColorState =
         rememberDominantColorState(
             defaultColor = backgroundColor,

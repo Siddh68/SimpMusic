@@ -89,8 +89,7 @@ import com.maxrave.simpmusic.viewModel.WrappedCard
 import com.maxrave.simpmusic.viewModel.WrappedUiState
 import com.maxrave.simpmusic.viewModel.WrappedViewModel
 import com.maxrave.simpmusic.viewModel.WrappedYear
-import io.ktor.client.HttpClient
-import io.ktor.client.engine.cio.CIO
+import com.maxrave.simpmusic.expect.platformHttpClient
 import io.ktor.http.Url
 import kotlinx.coroutines.launch
 import multiplatform.network.cmptoast.ToastGravity
@@ -188,7 +187,7 @@ private fun WrappedTheme(
     // rather than constructed inline the way those two do it — this composable reads the resolved
     // colour during composition, so a fresh client every pass would key a fresh loader and a fresh
     // state, and the colour would reset to the fallback on the very recomposition it caused.
-    val httpClient = remember { HttpClient(CIO) }
+    val httpClient = remember { platformHttpClient() }
     val networkLoader = rememberNetworkLoader(httpClient)
     val dominantColorState =
         rememberDominantColorState(
