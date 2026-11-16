@@ -21,5 +21,32 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         window.rootViewController = MainViewControllerKt.MainViewController()
         window.makeKeyAndVisible()
         self.window = window
+        // A cold launch from a URL delivers it here, not through openURLContexts.
+        handle(connectionOptions.urlContexts)
+    }
+
+    func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
+        handle(URLContexts)
+    }
+
+    /// Only `simpmusic://playertest` is acted on; every other URL stays ignored as before.
+    private func handle(_ contexts: Set<UIOpenURLContext>) {
+        guard contexts.contains(where: { Self.isPlayerTest($0.url) }) else { return }
+        // Next run-loop turn: on cold launch the root is not in the window hierarchy yet.
+        DispatchQueue.main.async { [weak self] in self?.presentPlayerTest() }
+    }
+
+    private static func isPlayerTest(_ url: URL) -> Bool {
+        url.scheme?.lowercased() == "simpmusic" && url.host()?.lowercased() == "playertest"
+    }
+
+    /// Full screen over whatever Compose is showing; Close in the test screen dismisses it.
+    private func presentPlayerTest() {
+        guard var top = window?.rootViewController else { return }
+        while let presented = top.presentedViewController { top = presented }
+        if top is PlayerTestViewController { return }
+        let test = PlayerTestViewController()
+        test.modalPresentationStyle = .fullScreen
+        top.present(test, animated: true)
     }
 }
