@@ -30,6 +30,8 @@ import org.koin.mp.KoinPlatform
 import org.simpmusic.discord.configDiscord
 import org.simpmusic.lastfm.configLastfm
 import platform.UIKit.UIDevice
+import platform.darwin.dispatch_async
+import platform.darwin.dispatch_get_main_queue
 import simpmusic.composeapp.generated.resources.Res
 import simpmusic.composeapp.generated.resources.explicit_content_blocked
 import simpmusic.composeapp.generated.resources.time_out_check_internet_connection_or_change_piped_instance_in_settings
@@ -67,7 +69,7 @@ internal fun startIosApp() {
 
     val mediaPlayerHandler = KoinPlatform.getKoin().get<MediaPlayerHandler>()
     mediaPlayerHandler.showToast = { type ->
-        showToast(
+        val message =
             when (type) {
                 ToastType.ExplicitContent -> {
                     runBlocking { getString(Res.string.explicit_content_blocked) }
@@ -80,8 +82,10 @@ internal fun startIosApp() {
                 is ToastType.SponsorBlockSkip -> {
                     runBlocking { ComposeResUtils.getResString(ComposeResUtils.StringType.SPONSOR_BLOCK_SKIP, type.category) }
                 }
-            },
-        )
+            }
+        // The player calls this from its own thread, and the toast adds a UIView: UIKit throws
+        // (and the app aborts) for a view added off the main thread.
+        dispatch_async(dispatch_get_main_queue()) { showToast(message) }
     }
     mediaPlayerHandler.pushPlayerError = { error ->
         Logger.e(TAG, "Player Error: ${error.message}, code: ${error.errorCode}, code name: ${error.errorCodeName}")
