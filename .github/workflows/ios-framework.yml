@@ -122,6 +122,9 @@ jobs:
           # --build-cache: task outputs (klibs of unchanged modules, KSP, resources) are reused
           # from the cached Gradle User Home, keyed by their inputs. Link tasks are not cacheable.
           ARGS="-PisFullBuild=false -PiosDeviceOnly=$IOS_DEVICE_ONLY --build-cache --stacktrace"
+          # The optimised (release) link of the whole app needs far more heap than debug: 5 GB ran out
+          # (Java heap space). The Intel runner has 14 GB; the arm64 one 7 GB.
+          if [ "$BUILD_TYPE" = release ]; then ARGS="$ARGS -Dorg.gradle.jvmargs=-Xmx10g"; fi
           if [ "$IOS_DEVICE_ONLY" = true ]; then
             # One slice -> one link; the XCFramework task depends on linkXxxFrameworkIosArm64 only.
             ./gradlew ":composeApp:$TASK" $ARGS
