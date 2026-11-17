@@ -1,3 +1,4 @@
+import AVFoundation
 import ComposeApp
 import Foundation
 
@@ -40,6 +41,15 @@ final class KotlinPlayerBridge: NSObject, DomainNativePlayerEngine, Sendable {
 
     func setRemoteCommandsEnabled(next: Bool, previous: Bool) {
         engine.setRemoteCommandsEnabled(next: next, previous: previous)
+    }
+
+    /// Main thread only (the Kotlin contract); nil anywhere else.
+    func nativePlayer(handle: Int32) -> Any? {
+        guard Thread.isMainThread else { return nil }
+        let engine = self.engine
+        nonisolated(unsafe) var player: AVPlayer?
+        MainActor.assumeIsolated { player = engine.player(handle: handle) }
+        return player
     }
 
     func setListener(listener: any DomainNativePlayerEngineListener) {

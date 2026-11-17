@@ -52,5 +52,13 @@ private fun Char.isRightToLeft(): Boolean =
 
 actual fun desktopOsName(): String = "iOS"
 
-// Kotlin/Native stack frames carry no class/method/line split to match against.
-actual fun Throwable.firstStackFrame(classPrefix: String): String? = null
+// Kotlin/Native frames are plain strings ("... kfun:com.example.Foo#bar(){} + 12 (/src/Foo.kt:3:5)"),
+// so the first one naming [classPrefix] is cut down to "com.example.Foo#bar" plus the source
+// position when the binary carries debug info.
+@OptIn(kotlin.experimental.ExperimentalNativeApi::class)
+actual fun Throwable.firstStackFrame(classPrefix: String): String? {
+    val frame = getStackTrace().firstOrNull { it.contains("kfun:$classPrefix") } ?: return null
+    val symbol = frame.substringAfter("kfun:").substringBefore('(')
+    val position = frame.substringAfterLast('(', "").substringBefore(')').substringAfterLast('/')
+    return if (position.isEmpty() || position == frame) symbol else "$symbol:$position"
+}

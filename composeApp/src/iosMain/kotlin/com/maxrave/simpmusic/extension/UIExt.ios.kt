@@ -5,7 +5,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import com.maxrave.domain.data.model.ui.ScreenSizeInfo
-import platform.UIKit.UIApplication
+import com.maxrave.simpmusic.expect.ui.IdleTimer
 import kotlin.math.roundToInt
 
 // The whole window, safe areas included — the same full-window bounds Android reads from WindowMetrics.
@@ -21,16 +21,16 @@ actual fun getScreenSizeInfo(): ScreenSizeInfo {
     )
 }
 
+// Reference-counted: Now Playing and the fullscreen player can both hold it.
 @Composable
 actual fun KeepScreenOn() {
     DisposableEffect(Unit) {
-        UIApplication.sharedApplication.idleTimerDisabled = true
-        onDispose {
-            UIApplication.sharedApplication.idleTimerDisabled = false
-        }
+        IdleTimer.acquire()
+        onDispose { IdleTimer.release() }
     }
 }
 
-// ponytail: no Picture in Picture on iOS yet.
+// iOS Picture in Picture (MediaPlayerView.ios.kt) shows the video in a system window while the
+// app's own UI is in the background, so no screen ever needs a shrunken "in PiP" layout.
 @Composable
 actual fun rememberIsInPipMode(): Boolean = false

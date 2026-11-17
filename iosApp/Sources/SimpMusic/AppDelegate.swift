@@ -27,6 +27,15 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         return config
     }
 
+    /// Kotlin narrows this to landscape while the fullscreen video player is open
+    /// (OrientationLock in composeApp); otherwise it is everything but upside down.
+    func application(
+        _ application: UIApplication,
+        supportedInterfaceOrientationsFor window: UIWindow?
+    ) -> UIInterfaceOrientationMask {
+        UIInterfaceOrientationMask(rawValue: UInt(MainViewControllerKt.orientationLockMask()))
+    }
+
     /// Music playback: keep playing with the silent switch on and in the background
     /// (UIBackgroundModes = audio in Info.plist).
     private func configureAudioSession() {

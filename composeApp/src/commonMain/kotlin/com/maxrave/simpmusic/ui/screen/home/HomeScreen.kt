@@ -862,9 +862,9 @@ fun HomeScreen(
                                             ),
                                         )
                                     }
-                                    // Android drops the 8dp over each section's title: the list's own 8dp
+                                    // Phones (Android, iOS) drop the 8dp over each section's title: the list's own 8dp
                                     // spacing already separates it from the shelf above.
-                                    if (getPlatform() != Platform.Android) Spacer(modifier = Modifier.height(8.dp))
+                                    if (getPlatform() == Platform.Desktop) Spacer(modifier = Modifier.height(8.dp))
                                     if (item.title == stringResource(Res.string.quick_picks)) {
                                         AnimatedVisibility(
                                             visible =
@@ -1390,7 +1390,7 @@ fun QuickPicks(
 
     // Quick picks draws its own header, and its 8dp around the block and 5dp around the title are
     // gaps no other shelf has: on Android they stood it 8dp further off the shelf above than the rest.
-    val compact = getPlatform() == Platform.Android
+    val compact = getPlatform() != Platform.Desktop
     Column(
         Modifier
             .padding(vertical = if (compact) 0.dp else 8.dp)

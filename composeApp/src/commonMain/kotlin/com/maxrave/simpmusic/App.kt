@@ -558,8 +558,9 @@ fun App(
                         exit = fadeOut(),
                     ) {
                         // On Android both materials go through the folding bar, which draws the mini
-                        // player itself. Desktop keeps the always-open flat bar under its own one.
-                        val useFoldingBar = getPlatform() == Platform.Android || isLiquidGlassEnabled == TRUE
+                        // player itself (iOS too, through its port of the bar). Desktop keeps the
+                        // always-open flat bar under its own one.
+                        val useFoldingBar = getPlatform() != Platform.Desktop || isLiquidGlassEnabled == TRUE
                         Column {
                             AnimatedVisibility(
                                 isShowMiniPlayer && !useFoldingBar && isLiquidGlassEnabled == DataStoreManager.FALSE,
@@ -634,7 +635,7 @@ fun App(
                             exit = fadeOut(),
                         ) {
                             MiniPlayer(
-                                if (getPlatform() == Platform.Android) {
+                                if (getPlatform() != Platform.Desktop) {
                                     Modifier
                                         // Glass keeps its 52dp card; the flat one is 56dp.
                                         .height(if (isLiquidGlassEnabled == TRUE) 56.dp else 60.dp)

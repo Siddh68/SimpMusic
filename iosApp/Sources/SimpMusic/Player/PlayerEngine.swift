@@ -1,3 +1,4 @@
+import AVFoundation
 import Dispatch
 import Foundation
 import Synchronization
@@ -73,6 +74,13 @@ final class PlayerEngine: Sendable {
     func setRemoteCommandsEnabled(next: Bool, previous: Bool) {
         onMain { $0.setRemoteCommandsEnabled(next: next, previous: previous) }
     }
+
+    // MARK: video (Phase 3)
+
+    /// The AVPlayer behind `handle`, which Kotlin attaches an AVPlayerLayer to; nil when the
+    /// handle is unknown or released. Kotlin only reads it and sets it on layers.
+    @MainActor
+    func player(handle: Int32) -> AVPlayer? { core.entry(handle)?.player }
 
     func setListener(listener: any PlayerEngineListener) { onMain { $0.listener = listener } }
 

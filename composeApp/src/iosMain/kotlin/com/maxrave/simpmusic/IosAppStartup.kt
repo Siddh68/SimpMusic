@@ -17,6 +17,7 @@ import com.maxrave.logger.Logger
 import com.maxrave.simpmusic.di.viewModelModule
 import com.maxrave.simpmusic.expect.iosDocumentsPath
 import com.maxrave.simpmusic.expect.platformHttpClient
+import com.maxrave.simpmusic.expect.startNetworkPathMonitor
 import com.maxrave.simpmusic.utils.ComposeResUtils
 import com.maxrave.simpmusic.utils.NetworkFirstInterceptor
 import com.maxrave.simpmusic.utils.VersionManager
@@ -66,6 +67,7 @@ internal fun startIosApp() {
 
     VersionManager.initialize()
     setUpImageLoader()
+    startNetworkPathMonitor()
 
     val mediaPlayerHandler = KoinPlatform.getKoin().get<MediaPlayerHandler>()
     mediaPlayerHandler.showToast = { type ->

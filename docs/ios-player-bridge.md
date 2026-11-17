@@ -217,22 +217,42 @@ The Swift names the header gives these types (plain or module-prefixed) are read
 | `playbackParameters` | Speed → `setRate`. Pitch is ignored (stays 1.0) |
 | `skipSilenceEnabled` | Stored, no effect |
 | `setEqualizer`, `setAudioEffects`, `setEightD` | Interface defaults (no-op); `eightDAvailable` stays false |
-| `audioOutputs`, `selectAudioOutput`, `refreshAudioOutputs` | Interface defaults; AirPlay picker is task 3.7 |
+| `audioOutputs`, `selectAudioOutput`, `refreshAudioOutputs` | Current system route + an "AirPlay & Bluetooth" entry; any pick opens the system route picker (`AvAudioRoutes`) |
 | `loadWaveform` | Interface default (`null`) |
 | `audioSessionId` | 0 |
 | `removeMediaItems` | Implemented as on desktop (the adapter owns the playlist, so the promise holds) |
 
-## 5. Video views (Phase 3, provisional)
+## 5. Video views (Phase 3, task 3.1 — replaces the planned NativeViewFactory)
 
-Not built in Phase 2. `create(video = true)` already exists so the adapter's code path is final.
-Planned shape, to be confirmed in task 3.1:
+One engine addition; everything else is Kotlin (`composeApp/iosMain/.../expect/ui/`):
 
 ```kotlin
-interface NativeViewFactory {
-    fun playerVideoView(): UIView                     // always shows the active handle
-    fun loopingVideoView(url: String, crop: Boolean): UIView   // Spotify canvas
-}
+/** The AVPlayer behind [handle], or null (unknown/released handle, or not on main). Main thread only. */
+fun nativePlayer(handle: Int): Any?
 ```
+
+Swift: `PlayerEngine.player(handle:)` (`@MainActor`) and `KotlinPlayerBridge.nativePlayer(handle:)`.
+Kotlin never changes the player's item, rate or volume; it only sets it on `AVPlayerLayer`s.
+
+- **Which handle shows video**: `NativeVideoOutput.handle` (domain iosMain), published by
+  `AvPlayerAdapter` after every serial task: the displayed handle (the incoming one during a
+  crossfade) when it was created with `video = true`, else `NO_HANDLE` (views show the artwork).
+- **Video source**: a track plays as video when it is a video item and the watch-video setting is
+  on (as on desktop). On iOS `StreamRepositoryImpl` picks the muxed stream for video playback: the
+  HLS manifest (pseudo-itag 96), else itag 18; that row is stored under the `VIDEO` key so it never
+  overwrites the audio row. No muxed stream = the track plays as audio. Downloads are unchanged.
+- **Main view**: one `AVPlayerLayer` per composable (`.resizeAspect`). It detaches the player on
+  `didEnterBackground` (synchronously) and re-attaches on `willEnterForeground`, so audio keeps
+  playing in the background; Picture in Picture keeps it attached. Size and first frame are read
+  off the item/layer (`presentationSize`, `readyForDisplay`), so the engine still never sends
+  `onVideoSize` / `onFirstVideoFrame`.
+- **PiP**: the fullscreen player's view (`shouldPip = true`) owns an `AVPictureInPictureController`
+  with `canStartPictureInPictureAutomaticallyFromInline`.
+- **Canvas**: its own muted `AVQueuePlayer` + `AVPlayerLooper`, not an engine handle: never on the
+  lock screen, no AirPlay, no display-sleep prevention, paused in the background.
+- **Fullscreen**: `OrientationLock` (Kotlin) is read by the AppDelegate's
+  `supportedInterfaceOrientationsFor` through `MainViewControllerKt.orientationLockMask()`;
+  `requestGeometryUpdate` rotates.
 
 ## 6. Swift side
 

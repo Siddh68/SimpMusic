@@ -83,6 +83,7 @@ import com.maxrave.simpmusic.ui.component.RippleIconButton
 import com.maxrave.simpmusic.ui.component.selection.SelectedSongsBottomSheet
 import com.maxrave.simpmusic.ui.component.selection.SongSelectionTopAppBar
 import com.maxrave.simpmusic.ui.component.selection.rememberSongSelectionState
+import com.maxrave.simpmusic.ui.icon.Download
 import com.maxrave.simpmusic.ui.icon.Groups
 import com.maxrave.simpmusic.ui.icon.PeopleAlt
 import com.maxrave.simpmusic.ui.icon.SimpIcons
@@ -109,6 +110,7 @@ import simpmusic.composeapp.generated.resources.downloaded_playlists
 import simpmusic.composeapp.generated.resources.favorite_playlists
 import simpmusic.composeapp.generated.resources.favorite_podcasts
 import simpmusic.composeapp.generated.resources.library
+import simpmusic.composeapp.generated.resources.spotify_import_title
 import simpmusic.composeapp.generated.resources.mix_for_you
 import simpmusic.composeapp.generated.resources.no_YouTube_playlists
 import simpmusic.composeapp.generated.resources.no_charts_found
@@ -487,6 +489,16 @@ fun LibraryScreen(
             // The Library bar had no actions slot at all — added for the Listen Together entry,
             // which the design canvas puts on Home AND Library.
             actions = {
+                // Import from Spotify (plan 4.1). Also in Home's Create sheet and Settings → Spotify.
+                androidx.compose.material3.IconButton(
+                    onClick = { navController.navigate(com.maxrave.simpmusic.ui.navigation.destination.library.SpotifyImportDestination) },
+                ) {
+                    androidx.compose.material3.Icon(
+                        SimpIcons.Download,
+                        contentDescription = stringResource(Res.string.spotify_import_title),
+                        tint = MaterialTheme.colorScheme.onBackground,
+                    )
+                }
                 ListenTogetherIconButton { navController.navigate(ListenTogetherDestination) }
             },
         )

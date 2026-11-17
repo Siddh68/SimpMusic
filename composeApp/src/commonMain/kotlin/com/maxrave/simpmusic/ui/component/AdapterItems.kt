@@ -410,9 +410,9 @@ private fun Content.hoverPlay(viewModel: BaseViewModel): (() -> Unit)? {
     return { viewModel.playFromEndpoint(endpoint, title) }
 }
 
-// Android packs the Home-family cards tighter than Desktop: 8dp sides, so two artworks sit 16dp apart
+// Phones (Android, iOS) pack the Home-family cards tighter than Desktop: 8dp sides, so two artworks sit 16dp apart
 // instead of 20. Desktop keeps the values it was tuned with.
-private val compactCards = getPlatform() == Platform.Android
+private val compactCards = getPlatform() != Platform.Desktop
 private val cardSidePadding = if (compactCards) 8.dp else 10.dp
 
 /**

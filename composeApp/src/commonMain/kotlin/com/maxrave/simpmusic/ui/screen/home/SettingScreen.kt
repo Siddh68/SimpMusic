@@ -149,6 +149,7 @@ import com.maxrave.simpmusic.ui.navigation.destination.login.DiscordLoginDestina
 import com.maxrave.simpmusic.ui.navigation.destination.login.LastfmLoginDestination
 import com.maxrave.simpmusic.ui.navigation.destination.login.LoginDestination
 import com.maxrave.simpmusic.ui.navigation.destination.login.SpotifyLoginDestination
+import com.maxrave.simpmusic.ui.navigation.destination.library.SpotifyImportDestination
 import com.maxrave.simpmusic.ui.theme.md_theme_dark_primary
 import com.maxrave.simpmusic.ui.theme.parseThemeColorHex
 import com.maxrave.simpmusic.ui.theme.typo
@@ -432,6 +433,8 @@ import simpmusic.composeapp.generated.resources.sponsorBlock
 import simpmusic.composeapp.generated.resources.sponsor_block_intro
 import simpmusic.composeapp.generated.resources.spotify
 import simpmusic.composeapp.generated.resources.spotify_canvas_cache
+import simpmusic.composeapp.generated.resources.spotify_import_description
+import simpmusic.composeapp.generated.resources.spotify_import_title
 import simpmusic.composeapp.generated.resources.spotify_lyrícs_info
 import simpmusic.composeapp.generated.resources.storage
 import simpmusic.composeapp.generated.resources.such_as_music_video_lyrics_video_podcasts_and_more
@@ -2155,6 +2158,12 @@ fun SettingScreen(
                         }
                     },
                 )
+                // Plan 4.1: works logged out too (public playlist links), so never disabled.
+                SettingItem(
+                    title = stringResource(Res.string.spotify_import_title),
+                    subtitle = stringResource(Res.string.spotify_import_description),
+                    onClick = { navController.navigate(SpotifyImportDestination) },
+                )
                 SettingItem(
                     title = stringResource(Res.string.enable_spotify_lyrics),
                     subtitle = stringResource(Res.string.spotify_lyrícs_info),
@@ -2322,9 +2331,12 @@ fun SettingScreen(
                 )
             }
         }
-        if (getPlatform() == Platform.Android) {
+        // iOS shows only the rows it can back: downloads and the image cache. It has no player
+        // cache (AVPlayer keeps none on disk), no canvas cache and no storage breakdown.
+        if (getPlatform() == Platform.Android || getPlatform() == Platform.iOS) {
             item(key = "storage") {
                 SettingGroup(title = stringResource(Res.string.storage)) {
+                    if (getPlatform() != Platform.iOS) {
                     SettingItem(
                         title = stringResource(Res.string.player_cache),
                         subtitle = "${playerCache.bytesToMB()} MB",
@@ -2342,6 +2354,7 @@ fun SettingScreen(
                             )
                         },
                     )
+                    }
                     SettingItem(
                         title = stringResource(Res.string.downloaded_cache),
                         subtitle = "${downloadedCache.bytesToMB()} MB",
@@ -2376,6 +2389,7 @@ fun SettingScreen(
                             )
                         },
                     )
+                    if (getPlatform() != Platform.iOS) {
                     SettingItem(
                         title = stringResource(Res.string.spotify_canvas_cache),
                         subtitle = "${canvasCache.bytesToMB()} MB",
@@ -2625,6 +2639,7 @@ fun SettingScreen(
                         Spacer(Modifier.width(8.dp))
                         Text(text = stringResource(Res.string.free_space), style = typo().bodySmall)
                     }
+                    } // end: not on iOS
                     Spacer(Modifier.height(12.dp))
                 }
             }

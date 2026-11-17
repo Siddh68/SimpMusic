@@ -267,7 +267,9 @@ fun MiniPlayer(
         job4.join()
     }
 
-    if (getPlatform() == Platform.Android) {
+    // iOS is a touch device too: it gets this card (play/pause, next, progress ring, loading
+    // spinner), not the Desktop capsule with its volume slider.
+    if (getPlatform() != Platform.Desktop) {
         // One shape for both the Card and the clip below. They must not diverge: the clip wraps
         // the Card's own background draw, so the larger radius wins and silently becomes the
         // visible one.

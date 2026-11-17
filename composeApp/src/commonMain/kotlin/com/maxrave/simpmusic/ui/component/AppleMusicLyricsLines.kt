@@ -215,13 +215,13 @@ fun Modifier.appleMusicLyricFocus(
                 // smudged block rather than an out-of-focus word. Unbounded lets the blur bleed
                 // past the bounds, which is what makes it look like depth of field.
                 //
-                // Desktop cannot have that. Each line is a LazyColumn item and skiko clips an item
+                // Desktop and iOS (both skiko) cannot have that. Each line is a LazyColumn item and skiko clips an item
                 // to its own bounds, so the part Unbounded deliberately paints outside gets sliced
                 // off at the item boundary — a hard horizontal tear across the line below the one
                 // being sung. Rectangle keeps every pixel inside the item, which is what that clip
                 // wants. The trade is softer-looking edges, only on lines already out of focus.
                 val edge =
-                    if (getPlatform() == Platform.Desktop) {
+                    if (getPlatform() != Platform.Android) {
                         BlurredEdgeTreatment.Rectangle
                     } else {
                         BlurredEdgeTreatment.Unbounded

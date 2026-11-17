@@ -50,11 +50,13 @@ import com.kyant.backdrop.highlight.Highlight
 import com.maxrave.domain.repository.ListenTogetherRepository
 import com.maxrave.simpmusic.expect.ui.PlatformBackdrop
 import com.maxrave.simpmusic.ui.icon.Add
+import com.maxrave.simpmusic.ui.icon.Download
 import com.maxrave.simpmusic.ui.icon.Groups
 import com.maxrave.simpmusic.ui.icon.PlaylistAdd
 import com.maxrave.simpmusic.ui.icon.Settings
 import com.maxrave.simpmusic.ui.icon.SimpIcons
 import com.maxrave.simpmusic.ui.navigation.destination.home.ListenTogetherDestination
+import com.maxrave.simpmusic.ui.navigation.destination.library.SpotifyImportDestination
 import com.maxrave.simpmusic.ui.theme.LocalLiquidGlassEnabled
 import com.maxrave.simpmusic.ui.theme.typo
 import com.maxrave.simpmusic.viewModel.SharedViewModel
@@ -72,6 +74,8 @@ import simpmusic.composeapp.generated.resources.local_playlist
 import simpmusic.composeapp.generated.resources.playlist_name
 import simpmusic.composeapp.generated.resources.playlist_name_cannot_be_empty
 import simpmusic.composeapp.generated.resources.settings
+import simpmusic.composeapp.generated.resources.spotify_import_description
+import simpmusic.composeapp.generated.resources.spotify_import_title
 
 /**
  * The top-bar "+" (Spotify's Create): a local playlist or a Listen Together room.
@@ -161,6 +165,10 @@ fun CreateActions(
                 showCreate = false
                 navController.navigate(ListenTogetherDestination)
             },
+            onSpotifyImport = {
+                showCreate = false
+                navController.navigate(SpotifyImportDestination)
+            },
         )
     }
     if (showPlaylistName) {
@@ -178,6 +186,7 @@ private fun CreateSheet(
     onDismiss: () -> Unit,
     onPlaylist: () -> Unit,
     onListenTogether: () -> Unit,
+    onSpotifyImport: () -> Unit,
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -214,6 +223,12 @@ private fun CreateSheet(
                     title = stringResource(Res.string.listen_together),
                     subtitle = stringResource(if (liveRoom) Res.string.create_room_live else Res.string.create_room_description),
                     onClick = onListenTogether,
+                )
+                CreateRow(
+                    icon = SimpIcons.Download,
+                    title = stringResource(Res.string.spotify_import_title),
+                    subtitle = stringResource(Res.string.spotify_import_description),
+                    onClick = onSpotifyImport,
                 )
                 EndOfModalBottomSheet()
             }
