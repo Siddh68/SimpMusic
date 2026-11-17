@@ -288,6 +288,14 @@ fun App(
                         }
                     }
 
+                    // simpmusic://play?q=SONG NAME — plays the top YouTube Music song result. What
+                    // a Siri Shortcut ("Play on SimpMusic") opens after asking which song.
+                    "play" -> {
+                        data.getQueryParameter("q")?.takeIf { it.isNotBlank() }?.let { query ->
+                            viewModel.playFromSearch(query)
+                        }
+                    }
+
                     "playlist" -> {
                         data.getQueryParameter("list")?.let { playlistId ->
                             if (playlistId.startsWith("OLAK5uy_")) {

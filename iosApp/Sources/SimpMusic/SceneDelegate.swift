@@ -29,11 +29,18 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         handle(URLContexts)
     }
 
-    /// Only `simpmusic://playertest` is acted on; every other URL stays ignored as before.
+    /// `simpmusic://playertest` opens the player test bench; every other `simpmusic://` link
+    /// (e.g. `simpmusic://play?q=…` from a Siri Shortcut) goes to the shared router in Kotlin.
     private func handle(_ contexts: Set<UIOpenURLContext>) {
-        guard contexts.contains(where: { Self.isPlayerTest($0.url) }) else { return }
-        // Next run-loop turn: on cold launch the root is not in the window hierarchy yet.
-        DispatchQueue.main.async { [weak self] in self?.presentPlayerTest() }
+        for context in contexts {
+            let url = context.url
+            if Self.isPlayerTest(url) {
+                // Next run-loop turn: on cold launch the root is not in the window hierarchy yet.
+                DispatchQueue.main.async { [weak self] in self?.presentPlayerTest() }
+            } else if url.scheme?.lowercased() == "simpmusic" {
+                MainViewControllerKt.openAppUrl(url: url.absoluteString)
+            }
+        }
     }
 
     private static func isPlayerTest(_ url: URL) -> Bool {

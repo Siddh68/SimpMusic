@@ -58,6 +58,8 @@ import com.maxrave.domain.repository.LocalPlaylistRepository
 import com.maxrave.domain.repository.LyricsCanvasRepository
 import com.maxrave.domain.repository.PlaylistRepository
 import com.maxrave.domain.repository.SongRepository
+import simpmusic.composeapp.generated.resources.no_results_found
+import com.maxrave.domain.repository.SearchRepository
 import com.maxrave.domain.repository.StreamRepository
 import com.maxrave.domain.repository.UpdateRepository
 import com.maxrave.domain.utils.Resource
@@ -933,6 +935,28 @@ class SharedViewModel(
         updateLyrics(videoId, (timeline.value.total / 1000).toInt(), lyrics, false, LyricsProvider.OFFLINE)
         insertLyrics(lyrics.toLyricsEntity(videoId))
         viewModelScope.launch { getAITranslationLyrics(videoId, lyrics) }
+    }
+
+    private val searchRepository: SearchRepository by inject()
+
+    /**
+     * Plays the top YouTube Music song result for [query] — what `simpmusic://play?q=…` does, the
+     * link a Siri Shortcut opens after asking which song to play. It then continues like a shared
+     * song: the song first, its radio after it.
+     */
+    fun playFromSearch(query: String) {
+        viewModelScope.launch {
+            val videoId =
+                runCatching {
+                    val result = searchRepository.getSearchDataSong(query).first()
+                    (result as? Resource.Success)?.data?.firstOrNull()?.videoId
+                }.getOrNull()
+            if (videoId.isNullOrBlank()) {
+                makeToast("${getString(Res.string.no_results_found)}: $query")
+            } else {
+                loadSharedMediaItem(videoId)
+            }
+        }
     }
 
     fun loadSharedMediaItem(videoId: String) {
