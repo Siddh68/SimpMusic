@@ -256,6 +256,11 @@ import simpmusic.composeapp.generated.resources.crossfade_dj_mode_description
 import simpmusic.composeapp.generated.resources.crossfade_duration
 import simpmusic.composeapp.generated.resources.crossfade_skip_album
 import simpmusic.composeapp.generated.resources.crossfade_skip_album_description
+import simpmusic.composeapp.generated.resources.dj_intensity
+import simpmusic.composeapp.generated.resources.dj_intensity_club
+import simpmusic.composeapp.generated.resources.dj_intensity_smooth
+import simpmusic.composeapp.generated.resources.dj_skip_transitions
+import simpmusic.composeapp.generated.resources.dj_skip_transitions_description
 import simpmusic.composeapp.generated.resources.custom_ai_model_id
 import simpmusic.composeapp.generated.resources.custom_color
 import simpmusic.composeapp.generated.resources.custom_model_id_messages
@@ -623,6 +628,8 @@ fun SettingScreen(
     val crossfadeDuration by viewModel.crossfadeDuration.collectAsStateWithLifecycle()
     val crossfadeDjMode by viewModel.crossfadeDjMode.collectAsStateWithLifecycle()
     val crossfadeSkipAlbum by viewModel.crossfadeSkipAlbum.collectAsStateWithLifecycle()
+    val djIntensity by viewModel.djIntensity.collectAsStateWithLifecycle()
+    val djSkipTransitions by viewModel.djSkipTransitions.collectAsStateWithLifecycle()
     val castState by viewModel.castState.collectAsStateWithLifecycle()
 
     val isCheckingUpdate by sharedViewModel.isCheckingUpdate.collectAsStateWithLifecycle()
@@ -1699,6 +1706,46 @@ fun SettingScreen(
                             switch = ((crossfadeDjMode) to { viewModel.setCrossfadeDjMode(it) }),
                             isEnable = !castState.isRemote,
                         )
+                        // Desktop-only knobs: iOS plays one pre-rendered transition style (DjTransitionRenderer).
+                        if (crossfadeDjMode && !isIos) {
+                            val smoothLabel = stringResource(Res.string.dj_intensity_smooth)
+                            val clubLabel = stringResource(Res.string.dj_intensity_club)
+                            SettingItem(
+                                title = stringResource(Res.string.dj_intensity),
+                                subtitle = if (djIntensity == "SMOOTH") smoothLabel else clubLabel,
+                                smallSubtitle = true,
+                                isEnable = !castState.isRemote,
+                                onClick = {
+                                    viewModel.setAlertData(
+                                        SettingAlertState(
+                                            title = runBlocking { getString(Res.string.dj_intensity) },
+                                            selectOne =
+                                                SettingAlertState.SelectData(
+                                                    listSelect =
+                                                        listOf(
+                                                            (djIntensity == "SMOOTH") to smoothLabel,
+                                                            (djIntensity != "SMOOTH") to clubLabel,
+                                                        ),
+                                                ),
+                                            confirm =
+                                                runBlocking { getString(Res.string.change) } to { state ->
+                                                    viewModel.setDjIntensity(
+                                                        if (state.selectOne?.getSelected() == smoothLabel) "SMOOTH" else "CLUB",
+                                                    )
+                                                },
+                                            dismiss = runBlocking { getString(Res.string.cancel) },
+                                        ),
+                                    )
+                                },
+                            )
+                            SettingItem(
+                                title = stringResource(Res.string.dj_skip_transitions),
+                                subtitle = stringResource(Res.string.dj_skip_transitions_description),
+                                smallSubtitle = true,
+                                switch = (djSkipTransitions to { viewModel.setDjSkipTransitions(it) }),
+                                isEnable = !castState.isRemote,
+                            )
+                        }
                         SettingItem(
                             title = stringResource(Res.string.crossfade_skip_album),
                             subtitle =

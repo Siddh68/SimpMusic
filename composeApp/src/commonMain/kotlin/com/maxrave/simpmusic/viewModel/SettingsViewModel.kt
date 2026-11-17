@@ -178,6 +178,12 @@ class SettingsViewModel(
     val crossfadeDjMode: StateFlow<Boolean> = _crossfadeDjMode
     private val _crossfadeSkipAlbum = MutableStateFlow<Boolean>(false)
     val crossfadeSkipAlbum: StateFlow<Boolean> = _crossfadeSkipAlbum
+
+    /** `DjIntensity` name: SMOOTH or CLUB. */
+    private val _djIntensity = MutableStateFlow("CLUB")
+    val djIntensity: StateFlow<String> = _djIntensity
+    private val _djSkipTransitions = MutableStateFlow(true)
+    val djSkipTransitions: StateFlow<Boolean> = _djSkipTransitions
     private val _autoDownloadLikedSongs = MutableStateFlow<Boolean>(false)
     val autoDownloadLikedSongs: StateFlow<Boolean> = _autoDownloadLikedSongs
     private val _smartDownloadsEnabled = MutableStateFlow<Boolean>(false)
@@ -327,6 +333,7 @@ class SettingsViewModel(
         getCrossfadeDuration()
         getCrossfadeDjMode()
         getCrossfadeSkipAlbum()
+        getDjSettings()
         getAutoDownloadLikedSongs()
         getSmartDownloads()
         getContributorNameAndEmail()
@@ -513,6 +520,24 @@ class SettingsViewModel(
             // the life of the ViewModel, one more per toggle.
             dataStoreManager.setCrossfadeSkipAlbum(enabled)
         }
+    }
+
+    private fun getDjSettings() {
+        viewModelScope.launch {
+            dataStoreManager.djIntensity.collect { _djIntensity.value = it }
+        }
+        viewModelScope.launch {
+            dataStoreManager.djSkipTransitions.collect { _djSkipTransitions.value = it == DataStoreManager.TRUE }
+        }
+    }
+
+    // Like setCrossfadeSkipAlbum: the collectors started in init pick the change up.
+    fun setDjIntensity(intensity: String) {
+        viewModelScope.launch { dataStoreManager.setDjIntensity(intensity) }
+    }
+
+    fun setDjSkipTransitions(enabled: Boolean) {
+        viewModelScope.launch { dataStoreManager.setDjSkipTransitions(enabled) }
     }
 
     private fun getAutoDownloadLikedSongs() {

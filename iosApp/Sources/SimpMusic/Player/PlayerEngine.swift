@@ -49,6 +49,11 @@ final class PlayerEngine: Sendable {
     func setRate(handle: Int32, rate: Float) { onMain { $0.setRate(handle, rate: rate) } }
     func release(handle: Int32) { onMain { $0.release(handle) } }
 
+    /// DJ join (docs/ios-player-bridge.md §7): start `handle` aligned to `refHandle` reaching `refMs`.
+    func playSynced(handle: Int32, refHandle: Int32, refMs: Int64) {
+        onMain { $0.playSynced(handle, refHandle: refHandle, refMs: refMs) }
+    }
+
     // MARK: reads (any thread, never block on main)
 
     func positionMs(handle: Int32) -> Int64 {
@@ -70,6 +75,8 @@ final class PlayerEngine: Sendable {
     }
 
     func clearNowPlaying() { onMain { $0.clearNowPlaying() } }
+
+    func setActivePositionOffset(offsetMs: Int64) { onMain { $0.setActivePositionOffset(offsetMs) } }
 
     func setRemoteCommandsEnabled(next: Bool, previous: Bool) {
         onMain { $0.setRemoteCommandsEnabled(next: next, previous: previous) }

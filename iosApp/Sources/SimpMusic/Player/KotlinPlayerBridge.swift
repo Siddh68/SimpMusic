@@ -27,6 +27,10 @@ final class KotlinPlayerBridge: NSObject, DomainNativePlayerEngine, Sendable {
     func setRate(handle: Int32, rate: Float) { engine.setRate(handle: handle, rate: rate) }
     func release(handle: Int32) { engine.release(handle: handle) }
 
+    func playSynced(handle: Int32, refHandle: Int32, refMs: Int64) {
+        engine.playSynced(handle: handle, refHandle: refHandle, refMs: refMs)
+    }
+
     func positionMs(handle: Int32) -> Int64 { engine.positionMs(handle: handle) }
     func durationMs(handle: Int32) -> Int64 { engine.durationMs(handle: handle) }
     func bufferedMs(handle: Int32) -> Int64 { engine.bufferedMs(handle: handle) }
@@ -38,6 +42,8 @@ final class KotlinPlayerBridge: NSObject, DomainNativePlayerEngine, Sendable {
     }
 
     func clearNowPlaying() { engine.clearNowPlaying() }
+
+    func setActivePositionOffset(offsetMs: Int64) { engine.setActivePositionOffset(offsetMs: offsetMs) }
 
     func setRemoteCommandsEnabled(next: Bool, previous: Bool) {
         engine.setRemoteCommandsEnabled(next: next, previous: previous)

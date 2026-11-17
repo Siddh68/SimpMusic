@@ -53,6 +53,8 @@ final class PlayerEngineCore {
 
     // System integration (PlayerEngineCore+System.swift).
     var activeHandle: Int32 = PlayerEngineConstants.noHandle
+    /// Added to the active handle's position on the lock screen (DJ segments); reset by setActiveHandle.
+    var activeOffsetMs: Int64 = 0
     var sessionActive = false
     var nowPlaying: NowPlayingText?
     var artwork: MPMediaItemArtwork?

@@ -72,6 +72,7 @@ extension PlayerEngineCore {
 
     func setActiveHandle(_ handle: Int32) {
         activeHandle = handle
+        activeOffsetMs = 0
         publishNowPlaying()
     }
 
@@ -120,7 +121,7 @@ extension PlayerEngineCore {
         if durationMs > 0 { info[MPMediaItemPropertyPlaybackDuration] = Double(durationMs) / 1000 }
 
         if let entry {
-            let positionMs = state.positionMs(activeHandle, nowNs: DispatchTime.now().uptimeNanoseconds)
+            let positionMs = max(0, state.positionMs(activeHandle, nowNs: DispatchTime.now().uptimeNanoseconds) + activeOffsetMs)
             // 0 while paused or buffering, so the lock-screen clock does not run ahead.
             let rate = entry.player.timeControlStatus == .playing ? entry.player.rate : 0
             info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = Double(positionMs) / 1000
