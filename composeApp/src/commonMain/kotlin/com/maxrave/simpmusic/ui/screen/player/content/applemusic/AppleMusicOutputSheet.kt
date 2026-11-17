@@ -279,8 +279,8 @@ private fun AudioOutput.kindLabel(): String? =
 
 private fun AudioOutput.icon(): ImageVector =
     when (kind) {
-        // The phone's own speaker on Android; the system default on desktop, which is a computer.
-        AudioOutputKind.DEVICE_SPEAKER -> if (getPlatform() == Platform.Android) SimpIcons.Smartphone else SimpIcons.Speaker
+        // The phone's own speaker on Android and iOS; the system default on desktop, which is a computer.
+        AudioOutputKind.DEVICE_SPEAKER -> if (getPlatform() != Platform.Desktop) SimpIcons.Smartphone else SimpIcons.Speaker
         AudioOutputKind.WIRED, AudioOutputKind.BLUETOOTH, AudioOutputKind.USB -> SimpIcons.Headphones
         AudioOutputKind.HDMI, AudioOutputKind.OTHER -> SimpIcons.Speaker
     }

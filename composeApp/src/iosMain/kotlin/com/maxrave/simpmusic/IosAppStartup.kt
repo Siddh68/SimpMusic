@@ -6,6 +6,7 @@ import coil3.SingletonImageLoader
 import coil3.annotation.ExperimentalCoilApi
 import coil3.compose.preferEndFirstIntrinsicSize
 import coil3.disk.DiskCache
+import coil3.memory.MemoryCache
 import coil3.network.ktor3.KtorNetworkFetcherFactory
 import coil3.request.CachePolicy
 import coil3.request.crossfade
@@ -30,6 +31,10 @@ import org.koin.core.context.startKoin
 import org.koin.mp.KoinPlatform
 import org.simpmusic.discord.configDiscord
 import org.simpmusic.lastfm.configLastfm
+import platform.Foundation.NSNotificationCenter
+import platform.Foundation.NSOperationQueue
+import platform.Foundation.NSProcessInfo
+import platform.UIKit.UIApplicationDidReceiveMemoryWarningNotification
 import platform.UIKit.UIDevice
 import platform.darwin.dispatch_async
 import platform.darwin.dispatch_get_main_queue
@@ -107,6 +112,13 @@ private fun setUpImageLoader() {
                     // Name the engine: commonMain also ships CIO, which has no TLS on native, and a bare
                     // HttpClient() may pick it — every https image then fails.
                     add(KtorNetworkFetcherFactory(httpClient = { platformHttpClient() }))
+                }.memoryCache {
+                    // Coil's default on native is a share of a guessed total, not of this device's RAM.
+                    // Long sessions of scrolling artwork otherwise grow until iOS kills the app.
+                    MemoryCache
+                        .Builder()
+                        .maxSizeBytes(imageMemoryCacheBytes())
+                        .build()
                 }.diskCachePolicy(CachePolicy.ENABLED)
                 .networkCachePolicy(CachePolicy.ENABLED)
                 .diskCache(
@@ -122,4 +134,23 @@ private fun setUpImageLoader() {
                 .build()
         imageLoader
     }
+    // iOS's low-memory signal: drop decoded artwork (it is all on disk) before the system has to
+    // terminate the app. The token is kept so the observer lives as long as the process.
+    memoryWarningObserver =
+        NSNotificationCenter.defaultCenter.addObserverForName(
+            name = UIApplicationDidReceiveMemoryWarningNotification,
+            `object` = null,
+            queue = NSOperationQueue.mainQueue,
+        ) { _ ->
+            Logger.w(TAG, "Memory warning: clearing the image memory cache")
+            SingletonImageLoader.get(PlatformContext.INSTANCE).memoryCache?.clear()
+        }
+}
+
+private var memoryWarningObserver: Any? = null
+
+/** About 15% of the device's RAM, kept between 64 and 384 MB. */
+private fun imageMemoryCacheBytes(): Long {
+    val physical = NSProcessInfo.processInfo.physicalMemory.toLong()
+    return (physical * 15 / 100).coerceIn(64L * 1024 * 1024, 384L * 1024 * 1024)
 }

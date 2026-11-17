@@ -137,9 +137,11 @@ import com.maxrave.domain.utils.FilterState
 import com.maxrave.domain.utils.connectArtists
 import com.maxrave.domain.utils.toListName
 import com.maxrave.logger.Logger
+import com.maxrave.simpmusic.Platform
 import com.maxrave.simpmusic.expect.copyToClipboard
 import com.maxrave.simpmusic.expect.formatOneDecimal
 import com.maxrave.simpmusic.expect.shareUrl
+import com.maxrave.simpmusic.getPlatform
 import com.maxrave.simpmusic.expect.ui.VerticalScrollBar
 import com.maxrave.simpmusic.expect.ui.persistPickedImage
 import com.maxrave.simpmusic.expect.ui.photoPickerResult
@@ -2325,7 +2327,7 @@ fun SleepTimerBottomSheet(
         contentColor = Color.Transparent,
         dragHandle = null,
         scrimColor = Color.Black.copy(alpha = .5f),
-        contentWindowInsets = { WindowInsets(0, 0, 0, 0) },
+        contentWindowInsets = { textFieldSheetInsets() },
     ) {
         Card(
             modifier = Modifier.fillMaxWidth().wrapContentHeight(),
@@ -2945,7 +2947,7 @@ fun PlaylistBottomSheet(
             contentColor = Color.Transparent,
             dragHandle = null,
             scrimColor = Color.Black.copy(alpha = .5f),
-            contentWindowInsets = { WindowInsets(0, 0, 0, 0) },
+            contentWindowInsets = { textFieldSheetInsets() },
         ) {
             Card(
                 modifier = Modifier.fillMaxWidth().wrapContentHeight(),
@@ -3137,7 +3139,7 @@ fun LocalPlaylistBottomSheet(
             contentColor = Color.Transparent,
             dragHandle = null,
             scrimColor = Color.Black.copy(alpha = .5f),
-            contentWindowInsets = { WindowInsets(0, 0, 0, 0) },
+            contentWindowInsets = { textFieldSheetInsets() },
         ) {
             Card(
                 modifier = Modifier.fillMaxWidth().wrapContentHeight(),
@@ -3366,7 +3368,7 @@ fun DevLogInBottomSheet(
         contentColor = Color.Transparent,
         dragHandle = null,
         scrimColor = Color.Black.copy(alpha = .5f),
-        contentWindowInsets = { WindowInsets(0, 0, 0, 0) },
+        contentWindowInsets = { textFieldSheetInsets() },
     ) {
         Card(
             modifier = Modifier.fillMaxWidth().wrapContentHeight(),
@@ -3505,3 +3507,10 @@ sealed class DevLogInType {
             is Discord -> getString(Res.string.your_discord_token)
         }
 }
+
+/**
+ * Insets for a sheet holding a text field. iOS has no adjustResize, so there the sheet pads itself
+ * above the keyboard; Android and desktop keep the no-insets behaviour they always had.
+ */
+@Composable
+private fun textFieldSheetInsets(): WindowInsets = if (getPlatform() == Platform.iOS) WindowInsets.ime else WindowInsets(0, 0, 0, 0)

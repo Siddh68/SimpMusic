@@ -1186,4 +1186,6 @@
     <string name="spotify_import_invalid_link">That is not a Spotify playlist link</string>
     <string name="spotify_import_search_title">Pick the right song</string>
     <string name="spotify_import_no_results">No results</string>
+    <string name="ios_version_by">iOS version by</string>
+    <string name="restore_reopen_ios">Restored. SimpMusic will close now; open it again to apply the backup.</string>
 </resources>

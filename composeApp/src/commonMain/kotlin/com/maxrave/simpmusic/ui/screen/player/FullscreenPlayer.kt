@@ -15,6 +15,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -52,6 +56,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.maxrave.simpmusic.Platform
+import com.maxrave.simpmusic.getPlatform
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
@@ -335,7 +341,13 @@ fun FullscreenPlayer(
                                         ),
                                     ).padding(horizontal = 12.dp)
                                     .fillMaxWidth(),
-                            windowInsets = WindowInsets(0, 0, 0, 0),
+                            // iPhone landscape: keep the back button clear of the Dynamic Island / notch side.
+                            windowInsets =
+                                if (getPlatform() == Platform.iOS) {
+                                    WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)
+                                } else {
+                                    WindowInsets(0, 0, 0, 0)
+                                },
                             colors =
                                 TopAppBarDefaults.topAppBarColors().copy(
                                     containerColor = Color.Transparent,
@@ -532,7 +544,16 @@ fun FullscreenPlayer(
                                         .align(Alignment.BottomCenter)
                                         .fillMaxWidth()
                                         .fillMaxHeight(0.3f)
-                                        .padding(horizontal = 40.dp),
+                                        .then(
+                                            if (getPlatform() == Platform.iOS) {
+                                                // Clear of the island side and the home indicator.
+                                                Modifier.windowInsetsPadding(
+                                                    WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom),
+                                                )
+                                            } else {
+                                                Modifier
+                                            },
+                                        ).padding(horizontal = 40.dp),
                                 verticalArrangement = Arrangement.Bottom,
                             ) {
                                 Box(

@@ -26,6 +26,7 @@ import platform.Foundation.NSBundle
 import platform.Foundation.NSUserDefaults
 import platform.posix.exit
 import simpmusic.composeapp.generated.resources.Res
+import simpmusic.composeapp.generated.resources.restore_reopen_ios
 import simpmusic.composeapp.generated.resources.restore_success
 
 private const val TAG = "BackupRestore"
@@ -120,7 +121,7 @@ actual suspend fun restoreNative(
 
     withContext(Dispatchers.Main) {
         showToast(getString(Res.string.restore_success), ToastGravity.Bottom)
-        showToast("Restored. SimpMusic will close now; open it again to apply the backup.", ToastGravity.Bottom)
+        showToast(getString(Res.string.restore_reopen_ios), ToastGravity.Bottom)
         delay(2500)
         exit(0)
     }

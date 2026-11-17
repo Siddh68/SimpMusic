@@ -305,6 +305,7 @@ import simpmusic.composeapp.generated.resources.invalid_api_key
 import simpmusic.composeapp.generated.resources.invalid_host
 import simpmusic.composeapp.generated.resources.invalid_language_code
 import simpmusic.composeapp.generated.resources.invalid_port
+import simpmusic.composeapp.generated.resources.ios_version_by
 import simpmusic.composeapp.generated.resources.keep_backups
 import simpmusic.composeapp.generated.resources.keep_backups_format
 import simpmusic.composeapp.generated.resources.keep_your_youtube_playlist_offline
@@ -2874,7 +2875,7 @@ fun SettingScreen(
                 if (getPlatform() == Platform.iOS) {
                     // The iOS port is a separate effort from the upstream app; credit its builder here.
                     SettingItem(
-                        title = "iOS version by",
+                        title = stringResource(Res.string.ios_version_by),
                         subtitle = "Siddh Jain",
                         onClick = {
                             uriHandler.openUri("https://github.com/Siddh68")

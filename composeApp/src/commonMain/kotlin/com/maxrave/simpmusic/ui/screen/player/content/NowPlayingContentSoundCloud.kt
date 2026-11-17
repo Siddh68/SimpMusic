@@ -405,7 +405,8 @@ private fun NowPlayingSoundCloudLayout(
                     .background(colors.surfaceContainer)
                     .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = togglePlayPause),
         ) {
-            if (getPlatform() == Platform.Android) {
+            // Swipe between covers on the touch phones (Android, iOS), as the other styles do.
+            if (getPlatform() != Platform.Desktop) {
                 LeftToRight {
                     HorizontalPager(
                         state = state.artworkPagerState,
