@@ -1,5 +1,21 @@
 package com.maxrave.simpmusic.ui.screen.library
 
+import com.maxrave.simpmusic.viewModel.DownloadedSection
+import com.maxrave.simpmusic.ui.component.rememberHolderPainter
+import com.maxrave.simpmusic.expect.ui.PlatformBackHandler
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.ui.layout.ContentScale
+import coil3.request.crossfade
+import coil3.request.ImageRequest
+import coil3.request.CachePolicy
+import coil3.compose.LocalPlatformContext
+import coil3.compose.AsyncImage
 import simpmusic.composeapp.generated.resources.other_downloaded_songs
 import androidx.compose.foundation.layout.Row
 import androidx.compose.animation.AnimatedVisibility
@@ -150,6 +166,11 @@ fun LibraryDynamicPlaylistScreen(
     var tempMostPlayed by remember { mutableStateOf(emptyList<SongEntity>()) }
     val downloaded by viewModel.listDownloadedSong.collectAsStateWithLifecycle()
     val downloadedSections by viewModel.downloadedSections.collectAsStateWithLifecycle()
+    // The downloaded playlist opened from its tile; null shows the tiles. Saved so rotation and
+    // coming back from the player keep it open.
+    var openSectionKey by rememberSaveable { mutableStateOf<String?>(null) }
+    val openSection = downloadedSections.find { it.key == openSectionKey }
+    PlatformBackHandler(enabled = openSection != null) { openSectionKey = null }
     var tempDownloaded by remember { mutableStateOf(emptyList<SongEntity>()) }
     val cached by viewModel.listCachedSong.collectAsStateWithLifecycle()
     var tempCached by remember { mutableStateOf(emptyList<SongEntity>()) }
@@ -388,63 +409,55 @@ fun LibraryDynamicPlaylistScreen(
 
                 else -> {}
             }
+        } else if (type == LibraryDynamicPlaylistType.Downloaded && openSection != null) {
+            // One downloaded playlist opened from its tile: its songs, in playlist order. The
+            // search bar filters within it.
+            val section = openSection
+            items(
+                section.songs.filter { query.isEmpty() || !showSearchBar || it.matches(query) },
+                key = { "${section.key}-${it.videoId}" },
+            ) { song ->
+                SongFullWidthItems(
+                    songEntity = song,
+                    isPlaying = song.videoId == nowPlayingVideoId,
+                    modifier = Modifier.fillMaxWidth(),
+                    onMoreClickListener = {
+                        chosenSong = song
+                        showBottomSheet = true
+                    },
+                    onClickListener = { videoId ->
+                        viewModel.playDownloadedSection(section.key, videoId)
+                    },
+                    onAddToQueue = {
+                        sharedViewModel.addListToQueue(
+                            arrayListOf(song.toTrack()),
+                        )
+                    },
+                    selectionMode = selectionState.isActive,
+                    isSelected = selectionState.isSelected(song.videoId),
+                    onLongClick = { selectionState.start(it) },
+                    onSelectToggle = { selectionState.toggle(it) },
+                )
+            }
         } else if (type == LibraryDynamicPlaylistType.Downloaded && groupDownloads) {
-            // Downloads grouped by the playlist or album they were downloaded with; a search shows
-            // the plain list below instead, so matches are not split across groups.
-            downloadedSections.forEach { section ->
-                item(key = "section-${section.key}") {
-                    Row(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(start = 16.dp, end = 8.dp, top = 20.dp, bottom = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            Text(
-                                text = section.title ?: stringResource(Res.string.other_downloaded_songs),
-                                style = typo().titleMedium,
-                                color = MaterialTheme.colorScheme.onBackground,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            Text(
-                                text = stringResource(Res.string.album_length, section.songs.size.toString(), ""),
-                                style = typo().bodySmall,
-                            )
-                        }
-                        RippleIconButton(
-                            SimpIcons.PlayCircle,
-                            Modifier.size(36.dp),
-                            fillMaxSize = true,
-                            tint = MaterialTheme.colorScheme.onBackground,
-                        ) {
-                            viewModel.playDownloadedSection(section.key, null)
-                        }
+            // Downloads as playlist tiles, two per row; a search shows the plain list below instead,
+            // so matches are not split across playlists.
+            items(downloadedSections.chunked(2), key = { row -> row.joinToString("|") { it.key } }) { row ->
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    row.forEach { section ->
+                        DownloadedSectionTile(
+                            section = section,
+                            modifier = Modifier.weight(1f),
+                            onClick = { openSectionKey = section.key },
+                        )
                     }
-                }
-                items(section.songs, key = { "${section.key}-${it.videoId}" }) { song ->
-                    SongFullWidthItems(
-                        songEntity = song,
-                        isPlaying = song.videoId == nowPlayingVideoId,
-                        modifier = Modifier.fillMaxWidth(),
-                        onMoreClickListener = {
-                            chosenSong = song
-                            showBottomSheet = true
-                        },
-                        onClickListener = { videoId ->
-                            viewModel.playDownloadedSection(section.key, videoId)
-                        },
-                        onAddToQueue = {
-                            sharedViewModel.addListToQueue(
-                                arrayListOf(song.toTrack()),
-                            )
-                        },
-                        selectionMode = selectionState.isActive,
-                        isSelected = selectionState.isSelected(song.videoId),
-                        onLongClick = { selectionState.start(it) },
-                        onSelectToggle = { selectionState.toggle(it) },
-                    )
+                    if (row.size == 1) Spacer(Modifier.weight(1f))
                 }
             }
         } else {
@@ -637,7 +650,7 @@ fun LibraryDynamicPlaylistScreen(
                 LibraryDynamicPlaylistType.MostPlayed ->
                     stringResource(Res.string.album_length, mostPlayed.size.toString(), "")
                 LibraryDynamicPlaylistType.Downloaded ->
-                    stringResource(Res.string.album_length, downloaded.size.toString(), "")
+                    stringResource(Res.string.album_length, (openSection?.songs ?: downloaded).size.toString(), "")
                 LibraryDynamicPlaylistType.Cached ->
                     stringResource(Res.string.album_length, cached.size.toString(), "")
                 LibraryDynamicPlaylistType.Followed ->
@@ -659,7 +672,12 @@ fun LibraryDynamicPlaylistScreen(
                 title = {
                     Column {
                         Text(
-                            text = type.title(),
+                            text =
+                                if (openSection != null) {
+                                    openSection.title ?: stringResource(Res.string.other_downloaded_songs)
+                                } else {
+                                    type.title()
+                                },
                             style = typo().titleMedium,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -684,7 +702,7 @@ fun LibraryDynamicPlaylistScreen(
                             true,
                             tint = MaterialTheme.colorScheme.onBackground,
                         ) {
-                            navController.navigateUp()
+                            if (openSection != null) openSectionKey = null else navController.navigateUp()
                         }
                     }
                 },
@@ -717,6 +735,8 @@ fun LibraryDynamicPlaylistScreen(
                                         0,
                                     )
                                 }
+                            } else if (openSection != null) {
+                                viewModel.playDownloadedSection(openSection.key, null)
                             } else {
                                 viewModel.playAll(type)
                             }
@@ -748,6 +768,8 @@ fun LibraryDynamicPlaylistScreen(
                                         0,
                                     )
                                 }
+                            } else if (openSection != null) {
+                                viewModel.playDownloadedSection(openSection.key, null, shuffle = true)
                             } else {
                                 viewModel.shuffle(type)
                             }
@@ -1137,3 +1159,80 @@ private fun matchesQuery(
         artists?.any { it.contains(query, ignoreCase = true) } == true
 
 private fun SongEntity.matches(query: String): Boolean = matchesQuery(title, artistName, query)
+
+/**
+ * One downloaded playlist as a square tile: its cover (or a 2×2 mosaic of its songs' artwork when
+ * it has none), then its name and song count.
+ */
+@Composable
+private fun DownloadedSectionTile(
+    section: DownloadedSection,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    val shape = RoundedCornerShape(12.dp)
+    Column(
+        modifier =
+            modifier
+                .clip(shape)
+                .clickable(onClick = onClick),
+    ) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .aspectRatio(1f)
+                .clip(shape)
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+        ) {
+            val art = section.songs.mapNotNull { it.thumbnails?.takeIf(String::isNotBlank) }.distinct()
+            if (section.cover != null || art.size < 4) {
+                TileImage(section.cover ?: art.firstOrNull(), Modifier.fillMaxSize())
+            } else {
+                Column(Modifier.fillMaxSize()) {
+                    art.take(4).chunked(2).forEach { pair ->
+                        Row(Modifier.weight(1f).fillMaxWidth()) {
+                            pair.forEach { url -> TileImage(url, Modifier.weight(1f).fillMaxHeight()) }
+                        }
+                    }
+                }
+            }
+        }
+        Text(
+            text = section.title ?: stringResource(Res.string.other_downloaded_songs),
+            style = typo().titleSmall,
+            color = MaterialTheme.colorScheme.onBackground,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(top = 8.dp, start = 2.dp, end = 2.dp),
+        )
+        Text(
+            text = stringResource(Res.string.album_length, section.songs.size.toString(), ""),
+            style = typo().bodySmall,
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+            maxLines = 1,
+            modifier = Modifier.padding(start = 2.dp, end = 2.dp, bottom = 4.dp),
+        )
+    }
+}
+
+@Composable
+private fun TileImage(
+    url: String?,
+    modifier: Modifier,
+) {
+    AsyncImage(
+        model =
+            ImageRequest
+                .Builder(LocalPlatformContext.current)
+                .data(url)
+                .diskCachePolicy(CachePolicy.ENABLED)
+                .diskCacheKey(url)
+                .crossfade(true)
+                .build(),
+        placeholder = rememberHolderPainter(),
+        error = rememberHolderPainter(),
+        contentDescription = null,
+        contentScale = ContentScale.Crop,
+        modifier = modifier,
+    )
+}

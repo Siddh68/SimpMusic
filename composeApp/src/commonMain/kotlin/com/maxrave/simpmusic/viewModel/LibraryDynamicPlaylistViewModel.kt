@@ -53,6 +53,8 @@ data class DownloadedSection(
     val key: String,
     val title: String?,
     val songs: List<SongEntity>,
+    /** The playlist's own cover, or null to build one from its songs' artwork. */
+    val cover: String? = null,
 ) {
     companion object {
         const val OTHER_KEY = "other"
@@ -191,32 +193,52 @@ class LibraryDynamicPlaylistViewModel(
     private suspend fun buildDownloadedSections(songs: List<SongEntity>): List<DownloadedSection> {
         if (songs.isEmpty()) return emptyList()
         val byId = songs.associateBy { it.videoId }
-        val candidates: List<Triple<String, String, Pair<Int, List<String>>>> =
+        val candidates: List<SectionCandidate> =
             withContext(Dispatchers.IO) {
                 val local =
                     runCatching { localPlaylistRepository.getAllLocalPlaylists().first() }
                         .getOrDefault(emptyList())
-                        .map { Triple("local:${it.id}", it.title, it.downloadState to it.tracks.orEmpty()) }
+                        .map { p ->
+                            SectionCandidate("local:${p.id}", p.title, p.thumbnail, p.downloadState, p.tracks.orEmpty()) {
+                                localPlaylistRepository.updateLocalPlaylistDownloadState(DownloadState.STATE_DOWNLOADED, p.id)
+                            }
+                        }
                 val online =
                     runCatching { playlistRepository.getAllPlaylists(Int.MAX_VALUE).first() }
                         .getOrDefault(emptyList())
-                        .map { Triple("playlist:${it.id}", it.title, it.downloadState to it.tracks.orEmpty()) }
+                        .map { p ->
+                            SectionCandidate("playlist:${p.id}", p.title, p.thumbnails, p.downloadState, p.tracks.orEmpty()) {
+                                playlistRepository.updatePlaylistDownloadState(p.id, DownloadState.STATE_DOWNLOADED)
+                            }
+                        }
                 val albums =
                     runCatching { albumRepository.getAllAlbums(Int.MAX_VALUE).first() }
                         .getOrDefault(emptyList())
-                        .map { Triple("album:${it.browseId}", it.title, it.downloadState to it.tracks.orEmpty()) }
+                        .map { p ->
+                            SectionCandidate("album:${p.browseId}", p.title, p.thumbnails, p.downloadState, p.tracks.orEmpty()) {
+                                albumRepository.updateAlbumDownloadState(p.browseId, DownloadState.STATE_DOWNLOADED)
+                            }
+                        }
                 local + online + albums
             }
         val sections =
             candidates
-                .mapNotNull { (key, title, stateAndTracks) ->
-                    val (state, tracks) = stateAndTracks
-                    val ids = tracks.distinct()
+                .mapNotNull { candidate ->
+                    val ids = candidate.tracks.distinct()
                     val sectionSongs = ids.mapNotNull { byId[it] }
                     if (sectionSongs.isEmpty()) return@mapNotNull null
-                    val flagged = state != DownloadState.STATE_NOT_DOWNLOADED
+                    val flagged = candidate.downloadState != DownloadState.STATE_NOT_DOWNLOADED
                     val mostlyDownloaded = sectionSongs.size >= 2 && sectionSongs.size * 5 >= ids.size * 4
-                    if (flagged || mostlyDownloaded) DownloadedSection(key, title, sectionSongs) else null
+                    // Every song is here but the playlist still says "downloading" (its own screen
+                    // can miss the last completion): settle it, so its download button stops spinning.
+                    if (sectionSongs.size == ids.size && candidate.downloadState == DownloadState.STATE_DOWNLOADING) {
+                        candidate.markDownloaded()
+                    }
+                    if (flagged || mostlyDownloaded) {
+                        DownloadedSection(candidate.key, candidate.title, sectionSongs, candidate.cover?.takeIf { it.isNotBlank() })
+                    } else {
+                        null
+                    }
                 }.distinctBy { it.key }
                 // Most recently downloaded playlist first, like the plain list.
                 .sortedByDescending { section ->
@@ -228,18 +250,33 @@ class LibraryDynamicPlaylistViewModel(
         return if (others.isEmpty()) sections else sections + DownloadedSection(DownloadedSection.OTHER_KEY, null, others)
     }
 
+    private inner class SectionCandidate(
+        val key: String,
+        val title: String,
+        val cover: String?,
+        val downloadState: Int,
+        val tracks: List<String>,
+        private val setDownloaded: suspend () -> Unit,
+    ) {
+        fun markDownloaded() {
+            viewModelScope.launch { runCatching { setDownloaded() } }
+        }
+    }
+
     /** Plays one section of the Downloaded list as the queue, starting at [videoId] (or the top). */
     fun playDownloadedSection(
         sectionKey: String,
         videoId: String?,
+        shuffle: Boolean = false,
     ) {
         val section = _downloadedSections.value.find { it.key == sectionKey } ?: return
-        val playTrack = section.songs.find { it.videoId == videoId } ?: section.songs.firstOrNull() ?: return
+        val songs = if (shuffle) section.songs.shuffled() else section.songs
+        val playTrack = songs.find { it.videoId == videoId } ?: songs.firstOrNull() ?: return
         viewModelScope.launch {
             val name = section.title ?: getString(Res.string.downloaded)
             setQueueData(
                 QueueData.Data(
-                    listTracks = section.songs.toArrayListTrack(),
+                    listTracks = songs.toArrayListTrack(),
                     firstPlayedTrack = playTrack.toTrack(),
                     playlistId = null,
                     playlistName = "${getString(Res.string.playlist)} $name",
@@ -250,7 +287,7 @@ class LibraryDynamicPlaylistViewModel(
             loadMediaItem(
                 playTrack.toTrack(),
                 Config.PLAYLIST_CLICK,
-                section.songs.indexOf(playTrack).coerceAtLeast(0),
+                songs.indexOf(playTrack).coerceAtLeast(0),
             )
         }
     }
