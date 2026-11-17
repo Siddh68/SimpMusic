@@ -1,5 +1,7 @@
 package com.maxrave.simpmusic.ui.screen.library
 
+import simpmusic.composeapp.generated.resources.other_downloaded_songs
+import androidx.compose.foundation.layout.Row
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -147,6 +149,7 @@ fun LibraryDynamicPlaylistScreen(
     val mostPlayed by viewModel.listMostPlayedSong.collectAsStateWithLifecycle()
     var tempMostPlayed by remember { mutableStateOf(emptyList<SongEntity>()) }
     val downloaded by viewModel.listDownloadedSong.collectAsStateWithLifecycle()
+    val downloadedSections by viewModel.downloadedSections.collectAsStateWithLifecycle()
     var tempDownloaded by remember { mutableStateOf(emptyList<SongEntity>()) }
     val cached by viewModel.listCachedSong.collectAsStateWithLifecycle()
     var tempCached by remember { mutableStateOf(emptyList<SongEntity>()) }
@@ -223,6 +226,7 @@ fun LibraryDynamicPlaylistScreen(
             }
         }
         val type = LibraryDynamicPlaylistType.toType(type)
+        val groupDownloads = !(query.isNotEmpty() && showSearchBar) && downloadedSections.isNotEmpty()
         if (type == LibraryDynamicPlaylistType.Followed) {
             items(
                 if (query.isNotEmpty() && showSearchBar) {
@@ -384,6 +388,65 @@ fun LibraryDynamicPlaylistScreen(
 
                 else -> {}
             }
+        } else if (type == LibraryDynamicPlaylistType.Downloaded && groupDownloads) {
+            // Downloads grouped by the playlist or album they were downloaded with; a search shows
+            // the plain list below instead, so matches are not split across groups.
+            downloadedSections.forEach { section ->
+                item(key = "section-${section.key}") {
+                    Row(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(start = 16.dp, end = 8.dp, top = 20.dp, bottom = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                text = section.title ?: stringResource(Res.string.other_downloaded_songs),
+                                style = typo().titleMedium,
+                                color = MaterialTheme.colorScheme.onBackground,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                text = stringResource(Res.string.album_length, section.songs.size.toString(), ""),
+                                style = typo().bodySmall,
+                            )
+                        }
+                        RippleIconButton(
+                            SimpIcons.PlayCircle,
+                            Modifier.size(36.dp),
+                            fillMaxSize = true,
+                            tint = MaterialTheme.colorScheme.onBackground,
+                        ) {
+                            viewModel.playDownloadedSection(section.key, null)
+                        }
+                    }
+                }
+                items(section.songs, key = { "${section.key}-${it.videoId}" }) { song ->
+                    SongFullWidthItems(
+                        songEntity = song,
+                        isPlaying = song.videoId == nowPlayingVideoId,
+                        modifier = Modifier.fillMaxWidth(),
+                        onMoreClickListener = {
+                            chosenSong = song
+                            showBottomSheet = true
+                        },
+                        onClickListener = { videoId ->
+                            viewModel.playDownloadedSection(section.key, videoId)
+                        },
+                        onAddToQueue = {
+                            sharedViewModel.addListToQueue(
+                                arrayListOf(song.toTrack()),
+                            )
+                        },
+                        selectionMode = selectionState.isActive,
+                        isSelected = selectionState.isSelected(song.videoId),
+                        onLongClick = { selectionState.start(it) },
+                        onSelectToggle = { selectionState.toggle(it) },
+                    )
+                }
+            }
         } else {
             items(
                 when (type) {
@@ -438,6 +501,13 @@ fun LibraryDynamicPlaylistScreen(
                             artistLiked
                         }
                     }
+
+                    // Handled by the branches above; listed because the compiler stops narrowing
+                    // `type` after the grouped-downloads condition.
+                    is LibraryDynamicPlaylistType.TopTracks,
+                    is LibraryDynamicPlaylistType.TopArtists,
+                    is LibraryDynamicPlaylistType.TopAlbums,
+                    -> emptyList()
                 },
                 key = { it.hashCode() },
             ) { song ->

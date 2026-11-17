@@ -3,8 +3,11 @@ package com.maxrave.simpmusic.viewModel
 import androidx.lifecycle.viewModelScope
 import com.maxrave.common.Config
 import com.maxrave.common.Config.REMOVED_SONG_DATE_TIME
+import com.maxrave.domain.data.entities.AlbumEntity
 import com.maxrave.domain.data.entities.ArtistEntity
 import com.maxrave.domain.data.entities.DownloadState
+import com.maxrave.domain.data.entities.LocalPlaylistEntity
+import com.maxrave.domain.data.entities.PlaylistEntity
 import com.maxrave.domain.data.entities.SongEntity
 import com.maxrave.domain.extension.now
 import com.maxrave.domain.mediaservice.handler.DownloadHandler
@@ -13,6 +16,7 @@ import com.maxrave.domain.mediaservice.handler.QueueData
 import com.maxrave.domain.repository.AnalyticsRepository
 import com.maxrave.domain.repository.ArtistRepository
 import com.maxrave.domain.repository.CacheRepository
+import com.maxrave.domain.repository.PlaylistRepository
 import com.maxrave.domain.repository.SongRepository
 import com.maxrave.domain.utils.toArrayListTrack
 import com.maxrave.domain.utils.toTrack
@@ -39,10 +43,22 @@ import kotlinx.datetime.minus
 import kotlinx.datetime.plus
 import org.koin.core.component.inject
 import simpmusic.composeapp.generated.resources.Res
+import simpmusic.composeapp.generated.resources.downloaded
 import simpmusic.composeapp.generated.resources.playlist
 import simpmusic.composeapp.generated.resources.removed_download
 import simpmusic.composeapp.generated.resources.wrapped_recap_month
 import simpmusic.composeapp.generated.resources.wrapped_recap_month_year
+
+/** One group of the Downloaded list; [title] is null for the "Other songs" group. */
+data class DownloadedSection(
+    val key: String,
+    val title: String?,
+    val songs: List<SongEntity>,
+) {
+    companion object {
+        const val OTHER_KEY = "other"
+    }
+}
 
 class LibraryDynamicPlaylistViewModel(
     private val songRepository: SongRepository,
@@ -51,6 +67,7 @@ class LibraryDynamicPlaylistViewModel(
     private val cacheRepository: CacheRepository,
 ) : BaseViewModel() {
     private val downloadUtils: DownloadHandler by inject()
+    private val playlistRepository: PlaylistRepository by inject()
 
     private val _listFavoriteSong: MutableStateFlow<List<SongEntity>> = MutableStateFlow(emptyList())
     val listFavoriteSong: StateFlow<List<SongEntity>> get() = _listFavoriteSong
@@ -143,11 +160,83 @@ class LibraryDynamicPlaylistViewModel(
     private fun getDownloadedSong() {
         viewModelScope.launch {
             songRepository.getDownloadedSongs().collectLatest { downloadedSong ->
-                _listDownloadedSong.value =
+                val songs =
                     (downloadedSong ?: emptyList()).sortedByDescending {
                         it.downloadedAt ?: REMOVED_SONG_DATE_TIME
                     }
+                _listDownloadedSong.value = songs
+                _downloadedSections.value = buildDownloadedSections(songs)
             }
+        }
+    }
+
+    /**
+     * The Downloaded list split by where the songs came from: one section per playlist or album the
+     * user downloaded as a whole (its downloadState is downloaded or downloading), in that
+     * playlist's own track order, then [DownloadedSection.OTHER_KEY] for downloads that belong to
+     * none of them. A song in two downloaded playlists shows in both. Empty when no playlist was
+     * downloaded, so the screen keeps its plain list.
+     */
+    private val _downloadedSections: MutableStateFlow<List<DownloadedSection>> = MutableStateFlow(emptyList())
+    val downloadedSections: StateFlow<List<DownloadedSection>> get() = _downloadedSections
+
+    private suspend fun buildDownloadedSections(songs: List<SongEntity>): List<DownloadedSection> {
+        if (songs.isEmpty()) return emptyList()
+        val playlists =
+            withContext(Dispatchers.IO) {
+                runCatching {
+                    playlistRepository.getAllDownloadedPlaylist().first() +
+                        playlistRepository.getAllDownloadingPlaylist().first()
+                }.getOrDefault(emptyList())
+            }
+        val byId = songs.associateBy { it.videoId }
+        val sections =
+            playlists
+                .mapNotNull { playlist ->
+                    val (key, title, tracks) =
+                        when (playlist) {
+                            is LocalPlaylistEntity -> Triple("local:${playlist.id}", playlist.title, playlist.tracks)
+                            is PlaylistEntity -> Triple("playlist:${playlist.id}", playlist.title, playlist.tracks)
+                            is AlbumEntity -> Triple("album:${playlist.browseId}", playlist.title, playlist.tracks)
+                            else -> return@mapNotNull null
+                        }
+                    val sectionSongs = tracks.orEmpty().distinct().mapNotNull { byId[it] }
+                    if (sectionSongs.isEmpty()) null else DownloadedSection(key, title, sectionSongs)
+                }.distinctBy { it.key }
+                // Most recently downloaded playlist first, like the plain list.
+                .sortedByDescending { section ->
+                    section.songs.maxOfOrNull { it.downloadedAt ?: REMOVED_SONG_DATE_TIME } ?: REMOVED_SONG_DATE_TIME
+                }
+        if (sections.isEmpty()) return emptyList()
+        val grouped = sections.flatMapTo(HashSet()) { section -> section.songs.map { it.videoId } }
+        val others = songs.filterNot { it.videoId in grouped }
+        return if (others.isEmpty()) sections else sections + DownloadedSection(DownloadedSection.OTHER_KEY, null, others)
+    }
+
+    /** Plays one section of the Downloaded list as the queue, starting at [videoId] (or the top). */
+    fun playDownloadedSection(
+        sectionKey: String,
+        videoId: String?,
+    ) {
+        val section = _downloadedSections.value.find { it.key == sectionKey } ?: return
+        val playTrack = section.songs.find { it.videoId == videoId } ?: section.songs.firstOrNull() ?: return
+        viewModelScope.launch {
+            val name = section.title ?: getString(Res.string.downloaded)
+            setQueueData(
+                QueueData.Data(
+                    listTracks = section.songs.toArrayListTrack(),
+                    firstPlayedTrack = playTrack.toTrack(),
+                    playlistId = null,
+                    playlistName = "${getString(Res.string.playlist)} $name",
+                    playlistType = PlaylistType.RADIO,
+                    continuation = null,
+                ),
+            )
+            loadMediaItem(
+                playTrack.toTrack(),
+                Config.PLAYLIST_CLICK,
+                section.songs.indexOf(playTrack).coerceAtLeast(0),
+            )
         }
     }
 
