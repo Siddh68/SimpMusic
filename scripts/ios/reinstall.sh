@@ -23,7 +23,7 @@ done
 if [ -z "${device:-}" ]; then
   echo
   echo "No iPhone found. Plug it in with the cable, unlock it, tap Trust if asked, and run this again."
-  echo "(If it still is not found: the Windows firewall rule for port 27015 may need re-adding; see PLAN.md.)"
+  echo "(If it still is not found: the Windows firewall rule for port 27015 may need re-adding; see docs/ios-upkeep.md.)"
   exit 3
 fi
 echo "Found iPhone $device"
