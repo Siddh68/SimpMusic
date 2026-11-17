@@ -3,17 +3,16 @@ package com.maxrave.simpmusic.viewModel
 import androidx.lifecycle.viewModelScope
 import com.maxrave.common.Config
 import com.maxrave.common.Config.REMOVED_SONG_DATE_TIME
-import com.maxrave.domain.data.entities.AlbumEntity
 import com.maxrave.domain.data.entities.ArtistEntity
 import com.maxrave.domain.data.entities.DownloadState
-import com.maxrave.domain.data.entities.LocalPlaylistEntity
-import com.maxrave.domain.data.entities.PlaylistEntity
 import com.maxrave.domain.data.entities.SongEntity
 import com.maxrave.domain.extension.now
 import com.maxrave.domain.mediaservice.handler.DownloadHandler
 import com.maxrave.domain.mediaservice.handler.PlaylistType
 import com.maxrave.domain.mediaservice.handler.QueueData
+import com.maxrave.domain.repository.AlbumRepository
 import com.maxrave.domain.repository.AnalyticsRepository
+import com.maxrave.domain.repository.LocalPlaylistRepository
 import com.maxrave.domain.repository.ArtistRepository
 import com.maxrave.domain.repository.CacheRepository
 import com.maxrave.domain.repository.PlaylistRepository
@@ -68,6 +67,8 @@ class LibraryDynamicPlaylistViewModel(
 ) : BaseViewModel() {
     private val downloadUtils: DownloadHandler by inject()
     private val playlistRepository: PlaylistRepository by inject()
+    private val albumRepository: AlbumRepository by inject()
+    private val localPlaylistRepository: LocalPlaylistRepository by inject()
 
     private val _listFavoriteSong: MutableStateFlow<List<SongEntity>> = MutableStateFlow(emptyList())
     val listFavoriteSong: StateFlow<List<SongEntity>> get() = _listFavoriteSong
@@ -180,28 +181,42 @@ class LibraryDynamicPlaylistViewModel(
     private val _downloadedSections: MutableStateFlow<List<DownloadedSection>> = MutableStateFlow(emptyList())
     val downloadedSections: StateFlow<List<DownloadedSection>> get() = _downloadedSections
 
+    /**
+     * A saved playlist, album or local playlist counts as "downloaded as a whole" when its own
+     * downloadState says so, or when most of its songs are downloaded. The second rule is needed
+     * because the flag is unreliable: local playlists (including Spotify imports) are left out of
+     * the repository's downloaded-playlist queries, and a YouTube playlist's flag is written to a row
+     * that may not exist yet when its download starts.
+     */
     private suspend fun buildDownloadedSections(songs: List<SongEntity>): List<DownloadedSection> {
         if (songs.isEmpty()) return emptyList()
-        val playlists =
-            withContext(Dispatchers.IO) {
-                runCatching {
-                    playlistRepository.getAllDownloadedPlaylist().first() +
-                        playlistRepository.getAllDownloadingPlaylist().first()
-                }.getOrDefault(emptyList())
-            }
         val byId = songs.associateBy { it.videoId }
+        val candidates: List<Triple<String, String, Pair<Int, List<String>>>> =
+            withContext(Dispatchers.IO) {
+                val local =
+                    runCatching { localPlaylistRepository.getAllLocalPlaylists().first() }
+                        .getOrDefault(emptyList())
+                        .map { Triple("local:${it.id}", it.title, it.downloadState to it.tracks.orEmpty()) }
+                val online =
+                    runCatching { playlistRepository.getAllPlaylists(Int.MAX_VALUE).first() }
+                        .getOrDefault(emptyList())
+                        .map { Triple("playlist:${it.id}", it.title, it.downloadState to it.tracks.orEmpty()) }
+                val albums =
+                    runCatching { albumRepository.getAllAlbums(Int.MAX_VALUE).first() }
+                        .getOrDefault(emptyList())
+                        .map { Triple("album:${it.browseId}", it.title, it.downloadState to it.tracks.orEmpty()) }
+                local + online + albums
+            }
         val sections =
-            playlists
-                .mapNotNull { playlist ->
-                    val (key, title, tracks) =
-                        when (playlist) {
-                            is LocalPlaylistEntity -> Triple("local:${playlist.id}", playlist.title, playlist.tracks)
-                            is PlaylistEntity -> Triple("playlist:${playlist.id}", playlist.title, playlist.tracks)
-                            is AlbumEntity -> Triple("album:${playlist.browseId}", playlist.title, playlist.tracks)
-                            else -> return@mapNotNull null
-                        }
-                    val sectionSongs = tracks.orEmpty().distinct().mapNotNull { byId[it] }
-                    if (sectionSongs.isEmpty()) null else DownloadedSection(key, title, sectionSongs)
+            candidates
+                .mapNotNull { (key, title, stateAndTracks) ->
+                    val (state, tracks) = stateAndTracks
+                    val ids = tracks.distinct()
+                    val sectionSongs = ids.mapNotNull { byId[it] }
+                    if (sectionSongs.isEmpty()) return@mapNotNull null
+                    val flagged = state != DownloadState.STATE_NOT_DOWNLOADED
+                    val mostlyDownloaded = sectionSongs.size >= 2 && sectionSongs.size * 5 >= ids.size * 4
+                    if (flagged || mostlyDownloaded) DownloadedSection(key, title, sectionSongs) else null
                 }.distinctBy { it.key }
                 // Most recently downloaded playlist first, like the plain list.
                 .sortedByDescending { section ->
