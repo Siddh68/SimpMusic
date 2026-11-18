@@ -20,6 +20,7 @@ import com.maxrave.simpmusic.extension.findActivity
 actual fun FullScreenRotationImmersive(
     onLaunch: () -> Unit,
     onDispose: () -> Unit,
+    @Suppress("UNUSED_PARAMETER") onExit: () -> Unit,
 ) {
     val resources = LocalResources.current
     val context = LocalContext.current

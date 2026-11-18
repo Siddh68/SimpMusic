@@ -260,6 +260,8 @@ import simpmusic.composeapp.generated.resources.dj_intensity
 import simpmusic.composeapp.generated.resources.dj_intensity_club
 import simpmusic.composeapp.generated.resources.dj_intensity_smooth
 import simpmusic.composeapp.generated.resources.dj_skip_transitions
+import simpmusic.composeapp.generated.resources.dj_smart_order
+import simpmusic.composeapp.generated.resources.dj_smart_order_description
 import simpmusic.composeapp.generated.resources.dj_skip_transitions_description
 import simpmusic.composeapp.generated.resources.custom_ai_model_id
 import simpmusic.composeapp.generated.resources.custom_color
@@ -1706,6 +1708,17 @@ fun SettingScreen(
                             switch = ((crossfadeDjMode) to { viewModel.setCrossfadeDjMode(it) }),
                             isEnable = !castState.isRemote,
                         )
+                        // iOS: choose the next song from the next few so neighbours mix (AvPlayerAdapter smart next).
+                        if (crossfadeDjMode && isIos) {
+                            val djSmartOrder by viewModel.djSmartOrder.collectAsStateWithLifecycle()
+                            SettingItem(
+                                title = stringResource(Res.string.dj_smart_order),
+                                subtitle = stringResource(Res.string.dj_smart_order_description),
+                                smallSubtitle = true,
+                                switch = (djSmartOrder to { viewModel.setDjSmartOrder(it) }),
+                                isEnable = !castState.isRemote,
+                            )
+                        }
                         // Desktop-only knobs: iOS plays one pre-rendered transition style (DjTransitionRenderer).
                         if (crossfadeDjMode && !isIos) {
                             val smoothLabel = stringResource(Res.string.dj_intensity_smooth)

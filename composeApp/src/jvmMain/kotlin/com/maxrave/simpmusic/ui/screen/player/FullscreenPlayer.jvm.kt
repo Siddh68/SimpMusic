@@ -6,5 +6,6 @@ import androidx.compose.runtime.Composable
 actual fun FullScreenRotationImmersive(
     onLaunch: () -> Unit,
     onDispose: () -> Unit,
+    @Suppress("UNUSED_PARAMETER") onExit: () -> Unit,
 ) {
 }

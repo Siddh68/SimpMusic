@@ -2,43 +2,29 @@ package com.maxrave.simpmusic.ui.screen.player
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import com.maxrave.simpmusic.expect.ui.IdleTimer
-import com.maxrave.simpmusic.expect.ui.OrientationLock
-import com.maxrave.simpmusic.expect.ui.keyWindowScene
-import platform.UIKit.UIInterfaceOrientationMaskLandscape
-import platform.UIKit.UIInterfaceOrientationMaskPortrait
-import platform.UIKit.UIInterfaceOrientationPortrait
-import platform.UIKit.UIInterfaceOrientationPortraitUpsideDown
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 
 /**
- * As on Android: landscape for as long as the fullscreen player is open, then back to the
- * orientation it was opened from; the screen stays awake meanwhile.
- *
- * The lock itself is the Swift AppDelegate's `supportedInterfaceOrientationsFor`, which reads
- * [OrientationLock]. iOS hides the status bar by itself in landscape on iPhone; hiding the home
- * indicator would need the root view controller's `prefersHomeIndicatorAutoHidden`, which the
- * Compose root does not expose, so it stays.
+ * On iPhone the main UI never rotates (rotating it crashed in Skia, see [LandscapeSongController]),
+ * so the fullscreen video does not turn the app sideways the way Android does. It opens the
+ * landscape song view in its video layout instead, a separate full-screen view controller that may
+ * rotate safely; closing that view (its close button, or turning the phone back upright) leaves the
+ * fullscreen route through [onExit]. The route itself stays underneath, in portrait, and works on
+ * its own if the landscape view could not be shown (another sheet already up).
  */
 @Composable
 actual fun FullScreenRotationImmersive(
     onLaunch: () -> Unit,
     onDispose: () -> Unit,
+    onExit: () -> Unit,
 ) {
+    val currentOnExit by rememberUpdatedState(onExit)
     DisposableEffect(true) {
         onLaunch()
-        val openedInPortrait =
-            when (keyWindowScene()?.effectiveGeometry?.interfaceOrientation) {
-                UIInterfaceOrientationPortrait, UIInterfaceOrientationPortraitUpsideDown -> true
-                else -> false
-            }
-        OrientationLock.set(UIInterfaceOrientationMaskLandscape)
-        IdleTimer.acquire()
+        LandscapeSongController.presentForced(onExit = { currentOnExit() })
         onDispose {
-            IdleTimer.release()
-            OrientationLock.set(
-                OrientationLock.DEFAULT_MASK,
-                rotateTo = if (openedInPortrait) UIInterfaceOrientationMaskPortrait else null,
-            )
+            LandscapeSongController.dismissForced()
             onDispose()
         }
     }

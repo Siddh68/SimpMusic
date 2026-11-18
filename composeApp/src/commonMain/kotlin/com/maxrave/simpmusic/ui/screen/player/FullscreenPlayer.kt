@@ -126,6 +126,7 @@ fun FullscreenPlayer(
             isFullScreen = false
             showNavBar()
         },
+        onExit = { navController.navigateUp() },
     )
 
     val nowPlayingState by sharedViewModel.nowPlayingScreenData.collectAsStateWithLifecycle()
@@ -815,4 +816,6 @@ fun FullscreenPlayer(
 expect fun FullScreenRotationImmersive(
     onLaunch: () -> Unit = {},
     onDispose: () -> Unit = {},
+    // iOS only: its fullscreen view can be closed from outside the route (see the iOS actual).
+    onExit: () -> Unit = {},
 )

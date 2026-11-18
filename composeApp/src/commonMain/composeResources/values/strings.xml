@@ -603,6 +603,8 @@
     <string name="crossfade_auto_description">Automatically calculate duration based on BPM (requires 320kbps stream with BPM data)</string>
     <string name="crossfade_dj_mode">DJ-Style Transition</string>
     <string name="crossfade_dj_mode_description">Mix songs like a DJ: beat-matched blends, filter sweeps, echo-outs and more, picked for each pair of songs from their tempo, key and structure.</string>
+    <string name="dj_smart_order">Smart order</string>
+    <string name="dj_smart_order_description">Pick the next song from the next few in the queue so that tempo, key and energy mix well.</string>
     <string name="auto_download_liked_songs">Download songs you like</string>
     <string name="auto_download_liked_songs_description">Automatically download a song for offline playback when you add it to Favorites, using your download quality setting. Turning this on also downloads the songs you already liked. Removing a like never deletes a download.</string>
     <string name="downloading_liked_songs">Downloading %1$d liked songs</string>

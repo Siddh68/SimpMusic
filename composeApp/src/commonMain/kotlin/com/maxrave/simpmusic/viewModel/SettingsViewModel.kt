@@ -176,6 +176,8 @@ class SettingsViewModel(
     val crossfadeDuration: StateFlow<Int> = _crossfadeDuration
     private val _crossfadeDjMode = MutableStateFlow<Boolean>(true)
     val crossfadeDjMode: StateFlow<Boolean> = _crossfadeDjMode
+    private val _djSmartOrder = MutableStateFlow<Boolean>(true)
+    val djSmartOrder: StateFlow<Boolean> = _djSmartOrder
     private val _crossfadeSkipAlbum = MutableStateFlow<Boolean>(false)
     val crossfadeSkipAlbum: StateFlow<Boolean> = _crossfadeSkipAlbum
 
@@ -332,6 +334,7 @@ class SettingsViewModel(
         getCrossfadeEnabled()
         getCrossfadeDuration()
         getCrossfadeDjMode()
+        getDjSmartOrder()
         getCrossfadeSkipAlbum()
         getDjSettings()
         getAutoDownloadLikedSongs()
@@ -495,6 +498,20 @@ class SettingsViewModel(
             dataStoreManager.crossfadeDjMode.collect { enabled ->
                 _crossfadeDjMode.value = enabled == DataStoreManager.TRUE
             }
+        }
+    }
+
+    private fun getDjSmartOrder() {
+        viewModelScope.launch {
+            dataStoreManager.djSmartOrder.collect { enabled ->
+                _djSmartOrder.value = enabled == DataStoreManager.TRUE
+            }
+        }
+    }
+
+    fun setDjSmartOrder(enabled: Boolean) {
+        viewModelScope.launch {
+            dataStoreManager.setDjSmartOrder(enabled)
         }
     }
 

@@ -8,11 +8,17 @@ import com.maxrave.simpmusic.viewModel.SharedViewModel
 import org.koin.mp.KoinPlatform
 import com.maxrave.domain.mediaservice.player.ios.NativePlayerRegistry
 import com.maxrave.simpmusic.expect.ui.OrientationLock
+import com.maxrave.simpmusic.ui.screen.player.LandscapeSongController
 import platform.UIKit.UIViewController
 
-/** Entry point for the Swift app (SceneDelegate). Starts Koin and Coil once before the first App(). */
+/**
+ * Entry point for the Swift app (SceneDelegate). Starts Koin and Coil once before the first App(),
+ * and the landscape song view's device-orientation watcher (the main UI itself stays portrait on
+ * iPhone, see OrientationLock).
+ */
 fun MainViewController(): UIViewController {
     startIosApp()
+    LandscapeSongController.start()
     return ComposeUIViewController { App() }
 }
 
@@ -26,7 +32,8 @@ fun registerNativePlayerEngine(engine: NativePlayerEngine) {
 
 /**
  * The `UIInterfaceOrientationMask` the app allows right now, for the Swift AppDelegate's
- * `supportedInterfaceOrientationsFor`. Landscape only while the fullscreen player is open.
+ * `supportedInterfaceOrientationsFor`. Portrait on iPhone; landscape only while the landscape song
+ * view (LandscapeSongController) covers the main UI.
  */
 fun orientationLockMask(): Int = OrientationLock.mask.toInt()
 

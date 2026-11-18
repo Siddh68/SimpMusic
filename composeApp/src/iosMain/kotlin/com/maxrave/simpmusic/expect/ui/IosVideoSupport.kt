@@ -14,12 +14,18 @@ import platform.UIKit.UIApplicationDidEnterBackgroundNotification
 import platform.UIKit.UIApplicationState
 import platform.UIKit.UIApplicationWillEnterForegroundNotification
 import platform.UIKit.UIColor
+import platform.UIKit.UIDevice
 import platform.UIKit.UIInterfaceOrientationMaskAllButUpsideDown
+import platform.UIKit.UIInterfaceOrientationMaskPortrait
+import platform.UIKit.UIUserInterfaceIdiomPad
+import platform.UIKit.UIViewController
 import platform.UIKit.UIView
 import platform.UIKit.UIWindow
 import platform.UIKit.UIWindowScene
 import platform.UIKit.UIWindowSceneGeometryPreferencesIOS
 import platform.UIKit.setNeedsUpdateOfSupportedInterfaceOrientations
+import platform.darwin.dispatch_async
+import platform.darwin.dispatch_get_main_queue
 import platform.darwin.NSObjectProtocol
 
 /**
@@ -87,26 +93,44 @@ internal fun keyWindow(): UIWindow? {
 /**
  * The interface orientations the app allows right now, read by the Swift AppDelegate's
  * `supportedInterfaceOrientationsFor` through `orientationLockMask()` (MainViewController.kt).
- * The fullscreen player narrows it to landscape while it is open.
+ *
+ * On iPhone the app itself is portrait only ([DEFAULT_MASK]): rotating the main Compose UI resized
+ * the liquid-glass tab bar's backdrop layers mid-frame and crashed in Skia (see
+ * LandscapeSongController). Landscape is allowed only while the landscape song view, a separate
+ * full-screen view controller, covers the main UI. iPad keeps every orientation but upside down.
  */
 internal object OrientationLock {
-    val DEFAULT_MASK: ULong = UIInterfaceOrientationMaskAllButUpsideDown
+    val DEFAULT_MASK: ULong =
+        if (UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad) {
+            UIInterfaceOrientationMaskAllButUpsideDown
+        } else {
+            UIInterfaceOrientationMaskPortrait
+        }
 
     var mask: ULong = DEFAULT_MASK
         private set
 
-    /** Allows [newMask] and rotates the window into one of [rotateTo] (or [newMask] when null). */
+    /**
+     * Allows [newMask] and rotates the window into one of [rotateTo] (or [newMask] when null).
+     * [onRefused] runs (main thread) when UIKit turns the rotation down.
+     */
     fun set(
         newMask: ULong,
         rotateTo: ULong? = null,
+        onRefused: () -> Unit = {},
     ) {
         mask = newMask
         val scene = keyWindowScene() ?: return
         scene.windows.filterIsInstance<UIWindow>().forEach { window ->
-            window.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations()
+            var controller: UIViewController? = window.rootViewController
+            while (controller != null) {
+                controller.setNeedsUpdateOfSupportedInterfaceOrientations()
+                controller = controller.presentedViewController
+            }
         }
         scene.requestGeometryUpdateWithPreferences(UIWindowSceneGeometryPreferencesIOS(interfaceOrientations = rotateTo ?: newMask)) { error ->
             Logger.w("OrientationLock", "Geometry update refused: ${error?.localizedDescription}")
+            dispatch_async(dispatch_get_main_queue()) { onRefused() }
         }
     }
 }
