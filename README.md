@@ -119,6 +119,28 @@ We collect crash data in the Full version to improve the app.
 I use [Sentry](http://sentry.io) crashlytics to catch all crashes in the Full version. [Sentry](https://github.com/getsentry/sentry) is the open-source project.
  If you don't want to be collected crash data, you must use FOSS version.
  
+## iOS app (community port)
+
+An iPhone build of SimpMusic, sharing the same Kotlin Multiplatform code as Android and Desktop.
+The player runs on AVPlayer through a small Swift bridge.
+
+**Install:** download `SimpMusic-iOS.ipa` from the [releases](https://github.com/Siddh68/SimpMusic/releases)
+and sideload it with [AltStore](https://altstore.io) or [SideStore](https://sidestore.io). iOS 18 or later.
+With a free Apple ID the app has to be refreshed every 7 days; AltStore and SideStore do that for you.
+
+**What works:**
+- Home, search, explore, charts, library, artists, albums, playlists, login
+- Background playback, lock screen and Control Center controls
+- Synced lyrics, Spotify canvas, music videos, landscape full-screen song view
+- Downloads, grouped by the playlist or album they came from; Spotify playlist import
+- `simpmusic://` links, including a play-by-name link for Siri Shortcuts
+- Optional DJ transitions: tempo- and key-matched beat blends between songs, with a smart queue order
+
+**Known limits:** no CarPlay, AI lyric translation does not work yet, and free signing expires after 7 days.
+
+To build it yourself, see [docs/ios-upkeep.md](docs/ios-upkeep.md); for how the player bridge works, see
+[docs/ios-player-bridge.md](docs/ios-player-bridge.md).
+
 ## Desktop app
 
 ### Which file should I download?
